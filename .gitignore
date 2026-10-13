@@ -1,0 +1,22 @@
+# deps / builds
+node_modules/
+frontend/dist/
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+# env & logs
+.env
+.env.*
+*.log
+logs/
+# editors / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# playwright
+.playwright-mcp/
+test-results/
+playwright-report/

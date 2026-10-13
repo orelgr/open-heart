@@ -1,0 +1,16 @@
+{
+  "name": "לבבות פתוחים",
+  "short_name": "לבבות פתוחים",
+  "description": "קלפי שיחה למפגשים עמוקים",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F5F1EB",
+  "theme_color": "#F5F1EB",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

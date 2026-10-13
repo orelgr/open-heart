@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+/* ---------- Design tokens (Apple-HIG inspired, warm ivory) ---------- */
+@theme {
+  --font-sans: "Heebo", -apple-system, "SF Pro Text", system-ui, sans-serif;
+  --font-display: "Frank Ruhl Libre", "Times New Roman", serif;
+
+  --color-canvas: #f5f1eb;
+  --color-ink: #1d1d1f;
+  --color-ink-soft: #3a3a3c;
+  --color-muted: #6e6a64;
+  --color-hairline: rgb(29 29 31 / 0.08);
+  --color-night: #1f2433;
+  --color-gold: #b8955a;
+  --color-gold-soft: #d8be8c;
+
+  /* category tones */
+  --color-sand: #cdb28a;
+  --color-sage: #8fa88c;
+  --color-sky: #8ea6c4;
+  --color-clay: #c08c78;
+  --color-plum: #9a88ae;
+
+  --radius-card: 28px;
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -6px rgb(31 36 51 / 0.12);
+  --shadow-card: 0 2px 6px rgb(0 0 0 / 0.05), 0 24px 48px -12px rgb(31 36 51 / 0.28);
+}
+
+:root {
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  overscroll-behavior: none;
+  overflow: hidden;
+}
+
+button {
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Glass material (iOS "regular material") */
+.glass {
+  background: rgb(255 255 255 / 0.62);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid rgb(255 255 255 / 0.7);
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-dark {
+  background: rgb(31 36 51 / 0.72);
+  backdrop-filter: saturate(160%) blur(24px);
+  -webkit-backdrop-filter: saturate(160%) blur(24px);
+  border: 1px solid rgb(255 255 255 / 0.08);
+}
+
+.safe-top {
+  padding-top: max(env(safe-area-inset-top), 12px);
+}
+.safe-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom), 16px);
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Subtle paper grain for card faces */
+.grain {
+  background-image: radial-gradient(rgb(0 0 0 / 0.035) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

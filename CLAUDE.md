@@ -96,7 +96,7 @@ Real phone on same Wi-Fi: use the "Network:" URL Vite prints (server.host = true
 ### Production with PM2 (single process serves API + SPA)
 ```bash
 git clone https://github.com/orelgr/open-heart.git && cd open-heart
-pip3 install -r backend/requirements.txt
+python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt
 cd frontend && npm ci && npm run build && cd ..
 npm i -g pm2
 pm2 start ecosystem.config.js     # app name: open-heart, 127.0.0.1:8000

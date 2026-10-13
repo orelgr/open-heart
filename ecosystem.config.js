@@ -7,7 +7,7 @@ module.exports = {
       cwd: "./backend",
       script: "App.py",
       interpreter: process.env.PYTHON || "python3",
-      env: { HOST: "127.0.0.1", PORT: "8000", CORS_ORIGINS: "https://openheart.gmarup.com" },
+      env: { HOST: "127.0.0.1", PORT: "8000", CORS_ORIGINS: "https://openhearts.gmarup.com" },
       max_memory_restart: "300M",
       autorestart: true,
     },

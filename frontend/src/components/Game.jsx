@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
 import { BookOpen, ChevronRight, LayoutGrid, RotateCcw, Undo2 } from "lucide-react";
-import Card, { CardBack } from "./Card.jsx";
+import Card from "./Card.jsx";
 import { RulesSheet } from "./Rules.jsx";
 import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { LogoMark } from "./Logo.jsx";
@@ -9,25 +9,31 @@ import { navigate } from "../lib/router.js";
 
 export default function Game({ content, deck, onRestart }) {
   const [index, setIndex] = useState(0);
-  const [dir, setDir] = useState(-1);
+  const [nav, setNav] = useState({ mode: "start", dir: -1, dragged: false, backFrom: -1 });
+  const exitDirs = useRef([]);
+  const progress = useMotionValue(0); // 0..1 drag distance of the top card
   const [rulesOpen, setRulesOpen] = useState(false);
 
-  const current = deck[index];
-  const next = deck[index + 1];
   const done = index >= deck.length;
   const questionsTotal = deck.filter((c) => c.kind === "question").length;
   const questionsSeen = deck.slice(0, index + 1).filter((c) => c.kind === "question").length;
 
   const advance = useCallback(
-    (d = -1) => {
+    (d = -1, dragged = false) => {
       if (index >= deck.length) return;
-      setDir(d);
+      exitDirs.current[index] = d;
+      setNav({ mode: "next", dir: d, dragged, backFrom: -1 });
       setIndex((i) => i + 1);
+      animate(progress, 0, { type: "spring", stiffness: 300, damping: 30 });
       navigator.vibrate?.(6);
     },
-    [index, deck.length]
+    [index, deck.length, progress]
   );
-  const back = () => index > 0 && (setDir(1), setIndex((i) => i - 1));
+  const back = () => {
+    if (index === 0) return;
+    setNav({ mode: "back", dir: 1, dragged: false, backFrom: exitDirs.current[index - 1] ?? -1 });
+    setIndex((i) => i - 1);
+  };
 
   useEffect(() => {
     const onKey = (e) => {
@@ -83,7 +89,7 @@ export default function Game({ content, deck, onRestart }) {
               <h2 className="font-display text-[30px]">סיימתם את החפיסה</h2>
               <p className="text-[15px] leading-relaxed text-muted">כל שיחה טובה מתחילה בשאלה אחת. תודה שהקשבתם.</p>
               <div className="mt-2 flex w-full flex-col gap-2">
-                <Button onClick={() => { onRestart(); setIndex(0); }}>
+                <Button onClick={() => { onRestart(); setNav({ mode: "start", dir: -1, dragged: false, backFrom: -1 }); setIndex(0); }}>
                   <RotateCcw size={18} /> ערבוב ומשחק חדש
                 </Button>
                 <Button variant="ghost" onClick={() => navigate("/select")}>
@@ -92,18 +98,11 @@ export default function Game({ content, deck, onRestart }) {
               </div>
             </motion.div>
           ) : (
-            <>
-              {next && (
-                <div className="absolute inset-0 scale-[0.94] translate-y-4 opacity-90" aria-hidden>
-                  <div className="relative size-full rounded-[var(--radius-card)] shadow-[var(--shadow-soft)]">
-                    <CardBack item={next} />
-                  </div>
-                </div>
-              )}
-              <AnimatePresence initial={false} custom={dir}>
-                <Card key={current.key + index} item={current} onSwipe={advance} />
-              </AnimatePresence>
-            </>
+            <AnimatePresence custom={nav}>
+              {deck.slice(index, index + 3).map((item, depth) => (
+                <Card key={item.key} item={item} depth={depth} nav={nav} onSwipe={advance} progress={progress} />
+              ))}
+            </AnimatePresence>
           )}
         </div>
       </div>

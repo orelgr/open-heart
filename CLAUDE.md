@@ -1,7 +1,7 @@
 # Open Heart — לבבות פתוחים
 
 Conversation-card game for dates (two players), shipped as a mobile-first PWA.
-UI name: **לבבות פתוחים** · Brand/folder/domain: **Open Heart** (`openheart.gmarup.com`).
+UI name: **לבבות פתוחים** · Brand/folder: **Open Heart** · Production domain: **`gmarup.com`** (root, + `www`).
 Remote: `https://github.com/orelgr/open-heart`.
 
 ## Architecture
@@ -56,9 +56,17 @@ ecosystem.config.js   PM2 process file
 - **Typography**: Heebo (UI) + Frank Ruhl Libre (display: title & questions) — elegant, readable Hebrew.
 - **Mood**: mature, family-friendly. Logo = two arcs of an *open* heart (gold + ink), no red hearts; category tones
   are desaturated naturals.
-- **Card game patterns**: face-down deck with category-tinted backs, next card peeking behind (scale .94),
-  tap = spring 3D flip (rotateY, `preserve-3d`, `backface-hidden`), drag-x swipe with rotation coupled to x,
-  throw-out exit; power cards have a distinct dark/gold back with a breathing glow so they read as a surprise.
+- **Card game patterns**: real 3-layer stack (`Game.jsx` renders `deck.slice(index, index+3)` keyed by card, so
+  each card physically moves up a layer instead of being swapped). Choreography lives in `Card.jsx` `variants`,
+  driven by a shared `nav` object `{mode: start|next|back, dir, dragged, backFrom}` passed to both
+  `AnimatePresence custom` (exits) and each card (enters):
+  - start: cards are dealt in from below, staggered back → front.
+  - drag: rotation coupled to x, light sweep (`glare`), cards behind lean forward via shared `progress` motion value.
+  - thrown exit keeps momentum on an upward arc; button exit = small anticipation lift then arc out.
+  - back (undo): card returns from the side it left (`exitDirs`), bottom card sinks away.
+  - flip: spring rotateY with a lift (scale 1.07, y −12) via `useAnimate` on an inner wrapper.
+  - `html, body { overflow: clip }` so off-screen cards never scroll the page.
+  Power cards have a distinct dark/gold back with a breathing glow so they read as a surprise.
 - **Fast navigation**: content preloaded/cached, screen transitions ≤ 220ms (exit 100ms), no route code splitting
   needed (124 KB gzip). `MotionConfig reducedMotion="user"` + CSS reduced-motion fallback.
 - In-game rules: discreet glass book button at the left of the hint row → iOS bottom sheet (drag-down/Esc/X to close).
@@ -95,7 +103,7 @@ pm2 start ecosystem.config.js     # app name: open-heart, 127.0.0.1:8000
 pm2 save && pm2 startup           # survive reboots
 # update: git pull && (cd frontend && npm ci && npm run build) && pm2 restart open-heart
 ```
-Point the reverse proxy (nginx/Caddy) for `openheart.gmarup.com` to `127.0.0.1:8000` with HTTPS (needed for the
+Point the reverse proxy (nginx/Caddy) for `gmarup.com` + `www.gmarup.com` to `127.0.0.1:8000` with HTTPS (needed for the
 service worker / installable PWA). Windows servers: set `PYTHON=python` (ecosystem uses `python3` by default).
 
 ## Testing (Playwright MCP, iPhone viewport 390×844)
@@ -127,11 +135,13 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | `lucide-react` | `lucide-react-native` (same names; `lib/icons.js` map unchanged) |
 | `localStorage` cache | `@react-native-async-storage/async-storage` |
 | `navigator.vibrate` | `expo-haptics` (`impactAsync(Light)`, `notificationAsync` on timer end) |
-| `fetch('/api/...')` relative | absolute `API_BASE` (`https://openheart.gmarup.com`) via `expo-constants` |
+| `fetch('/api/...')` relative | absolute `API_BASE` (`https://gmarup.com`) via `expo-constants` |
 | `dir="rtl"` on `<html>` | `I18nManager.forceRTL(true)` + reload; check `row` directions |
 | `requestAnimationFrame` timer | same, or Reanimated `withTiming` for the ring |
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-10-14 — v1.1: stacked-deck animation choreography (deal-in, lean, throw/arc, undo return, lifted flip);
+  home subtitle split to two lines without dash; production domain → gmarup.com.
 - 2026-10-14 — v1.0.0: backend (FastAPI + 90 questions, 9 power cards, rules), frontend (home, rules page,
   category select, game with swipe/flip cards, power cards + 10 s timer, rules sheet), PWA, Playwright pass, PM2 config.

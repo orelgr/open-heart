@@ -39,13 +39,18 @@ body,
   height: 100%;
 }
 
+/* clip (not hidden) also blocks programmatic scroll, so cards flying off-screen never shift the page */
+html,
+body {
+  overflow: clip;
+}
+
 body {
   margin: 0;
   background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   overscroll-behavior: none;
-  overflow: hidden;
 }
 
 button {

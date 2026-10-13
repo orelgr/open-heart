@@ -56,7 +56,9 @@ export default function Home({ content }) {
         </motion.h1>
         <p className="mt-2 text-[11px] font-medium tracking-[0.42em] text-gold">OPEN HEART</p>
         <p className="mt-5 max-w-[300px] text-[17px] leading-relaxed text-muted">
-          קלפי שיחה לשניים — להכיר, להעמיק, לצחוק ולבנות יחד.
+          קלפי שיחה לשניים
+          <br />
+          להכיר, להעמיק, לצחוק ולבנות יחד.
         </p>
         {content && (
           <p className="mt-4 text-[13px] text-muted/80" data-testid="home-stats">

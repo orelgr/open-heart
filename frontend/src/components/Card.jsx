@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { motion, useMotionValue, useTransform } from "framer-motion";
+import { motion, useAnimate, useMotionValue, useMotionValueEvent, useTransform } from "framer-motion";
 import { Zap } from "lucide-react";
 import { LogoMark } from "./Logo.jsx";
 import Timer from "./Timer.jsx";
@@ -7,17 +7,54 @@ import { iconFor, toneOf } from "../lib/icons.js";
 
 const SWIPE_DISTANCE = 110;
 const SWIPE_VELOCITY = 600;
-const flipSpring = { type: "spring", stiffness: 260, damping: 26 };
+const flipSpring = { type: "spring", stiffness: 210, damping: 22, mass: 0.9 };
+const settle = { type: "spring", stiffness: 300, damping: 28, mass: 0.8 };
+const OFF = () => (typeof window === "undefined" ? 600 : Math.max(window.innerWidth, 420) + 160);
 
+/** Resting pose for each layer of the stack (0 = top). */
+const layer = (depth) => ({
+  x: 0,
+  y: depth * 14,
+  scale: 1 - depth * 0.05,
+  rotate: 0,
+  opacity: depth > 2 ? 0 : 1,
+  filter: `brightness(${1 - depth * 0.05})`,
+});
+
+/**
+ * nav = { mode: "start" | "next" | "back", dir: -1 | 1, dragged: bool, backFrom: -1 | 1 }
+ * Shared by AnimatePresence (exits) and each card (enters), so every move has a coherent choreography.
+ */
 const variants = {
-  enter: { scale: 0.94, y: 16, opacity: 1 },
-  center: { scale: 1, y: 0, opacity: 1, transition: { type: "spring", stiffness: 320, damping: 30 } },
-  exit: (dir) => ({
-    x: dir * 520,
-    rotate: dir * 16,
-    opacity: 0,
-    transition: { duration: 0.32, ease: [0.32, 0.72, 0, 1] },
+  initial: (nav) => {
+    if (nav.mode === "start") return { y: 260, scale: 0.9, rotate: -6, opacity: 0, filter: "brightness(1)" };
+    if (nav.mode === "back") return { x: nav.backFrom * OFF(), y: -30, rotate: nav.backFrom * 24, scale: 1, opacity: 1, filter: "brightness(1)" };
+    return { ...layer(3), y: 54, scale: 0.84 }; // new card slides in at the bottom of the stack
+  },
+  rest: ({ depth, nav }) => ({
+    ...layer(depth),
+    transition:
+      nav.mode === "start"
+        ? { type: "spring", stiffness: 170, damping: 20, delay: 0.08 + (2 - depth) * 0.09 }
+        : { ...settle, delay: nav.mode === "next" ? depth * 0.035 : 0 },
   }),
+  exit: (nav) => {
+    if (nav.mode === "back") return { ...layer(3), y: 54, scale: 0.84, transition: { duration: 0.25 } };
+    const d = nav.dir;
+    return nav.dragged
+      ? // Thrown: keep the momentum, arc slightly upward and spin out.
+        { zIndex: 30, x: d * OFF(), y: -50, rotate: d * 26, opacity: 1, transition: { duration: 0.42, ease: [0.22, 0.61, 0.36, 1] } }
+      : // Button: a small anticipation lift, then glide off along an arc.
+        {
+          zIndex: 30,
+          x: [null, -d * 18, d * OFF()],
+          y: [null, -14, -60],
+          rotate: [null, -d * 3, d * 22],
+          scale: [null, 1.04, 1],
+          opacity: 1,
+          transition: { duration: 0.58, times: [0, 0.22, 1], ease: [0.45, 0, 0.2, 1] },
+        };
+  },
 };
 
 const faceBase = "absolute inset-0 overflow-hidden rounded-[var(--radius-card)] backface-hidden";
@@ -98,50 +135,81 @@ function CardFront({ item, isTop }) {
   );
 }
 
-/** Top card of the deck: tap to flip (3D), drag horizontally to swipe away. */
-export default function Card({ item, onSwipe }) {
+/** One card in the stack. Only the top card (depth 0) can be dragged and flipped. */
+export default function Card({ item, depth, nav, onSwipe, progress }) {
+  const isTop = depth === 0;
   const [flipped, setFlipped] = useState(false);
   const ignoreTap = useRef(false);
+  const leaving = useRef(false);
+  const [lift, animateLift] = useAnimate();
   const x = useMotionValue(0);
-  const rotate = useTransform(x, [-240, 240], [-14, 14]);
+  const rotate = useTransform(x, [-260, 260], [-16, 16]);
+  const glare = useTransform(x, [-200, 0, 200], [0.35, 0, 0.35]);
+  // The card right behind the top one leans forward as you drag.
+  const nudgeScale = useTransform(progress, [0, 1], [1, depth === 1 ? 1.045 : depth === 2 ? 1.02 : 1]);
+  const nudgeY = useTransform(progress, [0, 1], [0, depth === 1 ? -10 : depth === 2 ? -5 : 0]);
+
+  useMotionValueEvent(x, "change", (v) => {
+    if (isTop && !leaving.current) progress.set(Math.min(Math.abs(v) / 160, 1));
+  });
+
+  const flip = () => {
+    setFlipped((f) => !f);
+    navigator.vibrate?.(8);
+    // Lift off the table while turning, then settle.
+    animateLift(lift.current, { scale: [1, 1.07, 1], y: [0, -12, 0] }, { duration: 0.6, ease: [0.33, 0, 0.2, 1] });
+  };
 
   return (
     <motion.div
-      className="absolute inset-0 touch-pan-y"
-      style={{ x, rotate, perspective: 1400 }}
+      className={`absolute inset-0 ${isTop ? "cursor-grab touch-pan-y active:cursor-grabbing" : "pointer-events-none"}`}
+      style={{ x, rotate, zIndex: 10 - depth, perspective: 1400 }}
+      custom={{ depth, nav }}
       variants={variants}
-      initial="enter"
-      animate="center"
+      initial="initial"
+      animate="rest"
       exit="exit"
-      drag="x"
+      drag={isTop ? "x" : false}
       dragSnapToOrigin
-      dragElastic={0.9}
+      dragElastic={0.85}
+      dragTransition={{ bounceStiffness: 380, bounceDamping: 24 }}
+      whileDrag={{ scale: 1.03 }}
       onDragEnd={(_, info) => {
         if (Math.abs(info.offset.x) > SWIPE_DISTANCE || Math.abs(info.velocity.x) > SWIPE_VELOCITY) {
-          onSwipe(Math.sign(info.offset.x || info.velocity.x));
+          leaving.current = true;
+          onSwipe(Math.sign(info.offset.x || info.velocity.x), true);
         }
       }}
       onPointerDownCapture={(e) => {
         ignoreTap.current = !!e.target.closest?.("[data-no-flip]");
       }}
-      onTap={() => {
-        if (ignoreTap.current) return;
-        setFlipped((f) => !f);
-        navigator.vibrate?.(8);
-      }}
-      data-testid="card"
+      onTap={() => isTop && !ignoreTap.current && flip()}
+      data-testid={isTop ? "card" : undefined}
       data-flipped={flipped}
       data-kind={item.kind}
-      role="button"
-      aria-label={flipped ? "קלף גלוי" : "הקישו כדי לחשוף את הקלף"}
+      role={isTop ? "button" : undefined}
+      aria-hidden={!isTop}
+      aria-label={isTop ? (flipped ? "קלף גלוי" : "הקישו כדי לחשוף את הקלף") : undefined}
     >
-      <motion.div
-        className="preserve-3d relative size-full rounded-[var(--radius-card)] shadow-[var(--shadow-card)]"
-        animate={{ rotateY: flipped ? 180 : 0 }}
-        transition={flipSpring}
-      >
-        <CardBack item={item} hidden={flipped} />
-        <CardFront item={item} isTop />
+      <motion.div className="relative size-full" style={{ scale: nudgeScale, y: nudgeY }}>
+        <div ref={lift} className="relative size-full">
+        <motion.div
+          className={`preserve-3d relative size-full rounded-[var(--radius-card)] transition-shadow duration-300 ${
+            isTop ? "shadow-[var(--shadow-card)]" : "shadow-[var(--shadow-soft)]"
+          }`}
+          animate={{ rotateY: flipped ? 180 : 0 }}
+          transition={flipSpring}
+        >
+          <CardBack item={item} hidden={flipped} />
+          <CardFront item={item} isTop={isTop} />
+        </motion.div>
+        {/* Light sweep while dragging */}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-[var(--radius-card)] bg-[linear-gradient(115deg,transparent_30%,rgb(255_255_255/0.55)_50%,transparent_70%)] mix-blend-soft-light"
+          style={{ opacity: glare }}
+        />
+        </div>
       </motion.div>
     </motion.div>
   );

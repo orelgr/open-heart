@@ -1,7 +1,7 @@
 # Open Heart — לבבות פתוחים
 
 Conversation-card game for dates (two players), shipped as a mobile-first PWA.
-UI name: **לבבות פתוחים** · Brand/folder: **Open Heart** · Production domain: **`gmarup.com`** (root, + `www`).
+UI name: **לבבות פתוחים** · Brand/folder: **Open Heart** · Production domain: **`openheart.gmarup.com`** (subdomain of gmarup.com).
 Remote: `https://github.com/orelgr/open-heart`.
 
 ## Architecture
@@ -103,7 +103,7 @@ pm2 start ecosystem.config.js     # app name: open-heart, 127.0.0.1:8000
 pm2 save && pm2 startup           # survive reboots
 # update: git pull && (cd frontend && npm ci && npm run build) && pm2 restart open-heart
 ```
-Point the reverse proxy (nginx/Caddy) for `gmarup.com` + `www.gmarup.com` to `127.0.0.1:8000` with HTTPS (needed for the
+Point the reverse proxy (nginx/Caddy) for `openheart.gmarup.com` to `127.0.0.1:8000` with HTTPS (needed for the
 service worker / installable PWA). Windows servers: set `PYTHON=python` (ecosystem uses `python3` by default).
 
 ## Testing (Playwright MCP, iPhone viewport 390×844)
@@ -135,7 +135,7 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | `lucide-react` | `lucide-react-native` (same names; `lib/icons.js` map unchanged) |
 | `localStorage` cache | `@react-native-async-storage/async-storage` |
 | `navigator.vibrate` | `expo-haptics` (`impactAsync(Light)`, `notificationAsync` on timer end) |
-| `fetch('/api/...')` relative | absolute `API_BASE` (`https://gmarup.com`) via `expo-constants` |
+| `fetch('/api/...')` relative | absolute `API_BASE` (`https://openheart.gmarup.com`) via `expo-constants` |
 | `dir="rtl"` on `<html>` | `I18nManager.forceRTL(true)` + reload; check `row` directions |
 | `requestAnimationFrame` timer | same, or Reanimated `withTiming` for the ring |
 | manifest / sw.js | not needed (app icons via `app.json`) |

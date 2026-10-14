@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { toneOf } from "../lib/icons.js";
+import { HandBase, HandThumb } from "./Hands.jsx";
 
 /**
  * Riffle shuffle on a 3D table: halves slide in, hands grip and bend the inner corners up,
@@ -16,47 +17,6 @@ const HALF_X = 60;
 const STEP = 0.058; // seconds between consecutive card drops
 const TL = { slide: 0.5, grip: 0.9, drop0: 1.0, bridge: 2.0, bridgeEnd: 2.3, tap: 2.5 };
 const lastDrop = TL.drop0 + (N - 1) * STEP;
-
-/** Stylised hand + sleeve cuff, left hand (right one is mirrored). Thumb presses the deck's inner corner. */
-function Hand({ mirrored }) {
-  return (
-    <svg viewBox="0 0 150 160" width="132" height="141" style={{ transform: mirrored ? "scaleX(-1)" : undefined, overflow: "visible" }} aria-hidden>
-      <defs>
-        <linearGradient id="oh-skin" x1="0.1" y1="0" x2="0.9" y2="1">
-          <stop offset="0" stopColor="#F6DFC4" />
-          <stop offset="0.55" stopColor="#E7C29C" />
-          <stop offset="1" stopColor="#D5A97F" />
-        </linearGradient>
-        <linearGradient id="oh-sleeve" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#2A3046" />
-          <stop offset="1" stopColor="#1B2030" />
-        </linearGradient>
-        <filter id="oh-shadow" x="-20%" y="-20%" width="150%" height="150%">
-          <feDropShadow dx="0" dy="5" stdDeviation="5" floodColor="#1F2433" floodOpacity="0.28" />
-        </filter>
-      </defs>
-      <g filter="url(#oh-shadow)">
-        {/* sleeve + cuff */}
-        <path d="M18 160 L24 120 Q25 112 33 112 L83 112 Q91 112 92 120 L98 160 Z" fill="url(#oh-sleeve)" />
-        <rect x="24" y="112" width="68" height="9" rx="4.5" fill="#F4F0E8" opacity="0.95" />
-        {/* wrist */}
-        <path d="M34 114 L36 88 Q36 80 46 80 L72 80 Q82 80 82 88 L84 114 Z" fill="url(#oh-skin)" />
-        {/* back of the hand */}
-        <path d="M22 66 Q16 44 30 34 Q50 24 74 34 Q92 44 90 66 Q88 86 70 90 L46 90 Q26 88 22 66 Z" fill="url(#oh-skin)" />
-        {/* fingers curled around the outer edge of the deck */}
-        <g stroke="#C79A70" strokeWidth="0.9" strokeLinejoin="round" fill="url(#oh-skin)">
-          <rect x="6" y="44" width="38" height="15" rx="7.5" transform="rotate(-24 6 52)" />
-          <rect x="3" y="30" width="42" height="15.5" rx="7.75" transform="rotate(-34 3 38)" />
-          <rect x="6" y="15" width="42" height="15" rx="7.5" transform="rotate(-44 6 22)" />
-          <rect x="14" y="3" width="36" height="14" rx="7" transform="rotate(-54 14 10)" />
-        </g>
-        {/* thumb, pointing inward over the deck */}
-        <path d="M56 66 C 70 50, 96 34, 124 30 C 136 28.5, 140 40, 130 46 C 108 54, 90 70, 78 88 Z" fill="url(#oh-skin)" stroke="#C79A70" strokeWidth="0.9" strokeLinejoin="round" />
-        <path d="M118 31.5 C 128 30, 134 36, 130.5 41.5 C 126 43.5, 119 42.5, 115 38 Z" fill="#FBEBD6" opacity="0.9" />
-      </g>
-    </svg>
-  );
-}
 
 export default function ShuffleIntro({ tones, onDone }) {
   const reduce = useReducedMotion();
@@ -124,29 +84,30 @@ export default function ShuffleIntro({ tones, onDone }) {
     }
   }
 
-  const hand = (s) => (
+  // Hands rest under the deck (base layer) with the thumb pressing on top of it (front layer).
+  const handMotion = (s) =>
+    reduce
+      ? { opacity: 0 }
+      : {
+          x: [s * 230, 0, 0, -s * 8, -s * 18, -s * 18, 0, s * 230],
+          y: [70, 0, -4, 0, -10, 0, 6, 80],
+          opacity: [0, 1, 1, 1, 1, 1, 1, 0],
+        };
+  const handTransition = {
+    duration: T,
+    times: frac([0, TL.slide, TL.grip, lastDrop, TL.bridge + 0.1, TL.bridgeEnd, TL.tap, T]),
+    ease: "easeInOut",
+  };
+  const hand = (s, layer) => (
     <motion.div
-      key={s}
-      className="absolute left-1/2 top-1/2"
-      style={{ marginLeft: -66, marginTop: -26, zIndex: 40, transformOrigin: "50% 100%" }}
-      initial={{ x: s * 230, y: 90, opacity: 0 }}
-      animate={
-        reduce
-          ? { opacity: 0 }
-          : {
-              x: [s * 230, s * 112, s * 112, s * 104, s * 92, s * 92, s * 112, s * 230],
-              y: [90, 52, 42, 44, 36, 44, 52, 100],
-              rotate: [0, 0, s * 6, s * 3, s * 8, s * 2, 0, 0],
-              opacity: [0, 1, 1, 1, 1, 1, 1, 0],
-            }
-      }
-      transition={{
-        duration: T,
-        times: frac([0, TL.slide, TL.grip, lastDrop, TL.bridge + 0.1, TL.bridgeEnd, TL.tap, T]),
-        ease: "easeInOut",
-      }}
+      key={`${layer}-${s}`}
+      className="pointer-events-none absolute left-1/2 top-1/2"
+      style={{ marginLeft: s < 0 ? -157 : 7, marginTop: -33, zIndex: layer === "base" ? 5 : 40 }}
+      initial={{ x: s * 230, y: 70, opacity: 0 }}
+      animate={handMotion(s)}
+      transition={handTransition}
     >
-      <Hand mirrored={s > 0} />
+      {layer === "base" ? <HandBase mirrored={s > 0} /> : <HandThumb mirrored={s > 0} />}
     </motion.div>
   );
 
@@ -167,10 +128,11 @@ export default function ShuffleIntro({ tones, onDone }) {
           animate={reduce ? undefined : { scaleX: [1.25, 1, 1, 0.8, 0.9, 0.85, 0.8], opacity: [0, 0.8, 0.8, 1, 0.8, 1, 1] }}
           transition={{ duration: T, times: frac([0, TL.slide, TL.grip, TL.bridge, TL.bridgeEnd, TL.tap, T]), ease: "easeInOut" }}
         />
-        <div className="absolute inset-0" style={{ transformStyle: "preserve-3d", transform: "rotateX(54deg)" }}>
+        {[-1, 1].map((s) => hand(s, "base"))}
+        <div className="absolute inset-0" style={{ transformStyle: "preserve-3d", transform: "rotateX(54deg)", zIndex: 20 }}>
           {cards}
         </div>
-        {[-1, 1].map(hand)}
+        {[-1, 1].map((s) => hand(s, "thumb"))}
       </div>
       <motion.p
         initial={{ opacity: 0, y: 6 }}

@@ -41,7 +41,9 @@ function CardFace({ tone, power, logo }) {
 
 /* ---------------------------- Act 1: riffle ---------------------------- */
 const R1 = { T: 2.1, slide: 0.35, grip: 0.6, drop0: 0.66, step: 0.048, push: 1.4, tap: 1.58, lift: 1.68 };
-const HALF = 44; // halves overlap by ~16px at their inner corners, where the cards interleave
+const HALF = 52; // halves meet edge to edge: overlapping tilted planes would intersect and bleed through each other
+const HOLD = 24; // halves are held above the table, higher than the finished stack (N * 1.5), so released cards
+                 // always land *below* the cards still in hand and never poke through them
 const RIFFLE_W = 104;
 const RIFFLE_H = 146;
 
@@ -83,7 +85,7 @@ function Riffle({ palette, onDone }) {
             opacity: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             // released in place (interleaving in the overlap), then both halves are pushed together
             x: [s * 170, s * HALF, s * HALF, s * HALF, s * HALF, s * HALF, 0, 0, 0, 0],
-            z: [restZ, restZ, restZ, restZ, stackZ, stackZ, stackZ, stackZ + 9, stackZ, stackZ],
+            z: [restZ, restZ, HOLD + restZ, HOLD + restZ, stackZ, stackZ, stackZ, stackZ + 9, stackZ, stackZ],
             rotateY: [0, 0, s * 20, s * 20, 0, 0, 0, 0, 0, 0],
           }}
           transition={{

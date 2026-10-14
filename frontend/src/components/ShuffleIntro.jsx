@@ -93,7 +93,7 @@ function Riffle({ palette, onDone }) {
           animate={{
             opacity: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             x: [s * 190, s * SPREAD, s * SPREAD, s * SPREAD, pileX, pileX, 0, 0, 0, 0],
-            y: [handY, handY, handY - 30, handY - 30, pileY, pileY, pileY, pileY - 8, pileY, -k * 0.8],
+            y: [handY, handY, handY - 30, handY - 30, pileY, pileY, pileY, pileY - 8, pileY, -k * 1.3], // ends exactly on the helix start pose
             rotateY: [0, 0, s * 16, s * 16, 0, 0, 0, 0, 0, 0],
             rotateX: [TILT, TILT, TILT, TILT, TILT, TILT, TILT, TILT, TILT, 0],
             scale: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0.62],
@@ -137,8 +137,9 @@ const RADIUS = 118;
 const HELIX_W = 64;
 const HELIX_H = 90;
 
-function Helix({ palette, onDone }) {
+function Helix({ palette, onDone, play }) {
   useEffect(() => {
+    if (!play) return;
     const id = setTimeout(onDone, T2 * 1000 + 80);
     const ticks = [];
     if (navigator.vibrate) {
@@ -149,7 +150,7 @@ function Helix({ palette, onDone }) {
       clearTimeout(id);
       ticks.forEach(clearTimeout);
     };
-  }, [onDone]);
+  }, [onDone, play]);
 
   const f = (arr) => arr.map((t) => Math.min(t / T2, 1));
   const cards = Array.from({ length: N }, (_, i) => {
@@ -160,22 +161,25 @@ function Helix({ palette, onDone }) {
     const in1 = in0 + 0.5;
     const helixY = (i - (N - 1) / 2) * 7;
     const stackY = -i * 1.3;
+    // stacked cards get a small depth step: identical depth in a shared 3D scene makes the browser
+    // flip between them every frame (z-fighting), which showed up as a flicker right after the riffle
+    const restZ = i * 0.6;
     return (
       <motion.div
         key={i}
         className="absolute left-1/2 top-1/2"
         style={{ width: HELIX_W, height: HELIX_H, marginLeft: -HELIX_W / 2, marginTop: -HELIX_H / 2, transformStyle: "preserve-3d" }}
         initial={{ rotateY: 0, y: stackY }}
-        animate={{ rotateY: [0, 0, angle, angle, 0, 0], y: [stackY, stackY, helixY, helixY, stackY, stackY] }}
+        animate={play ? { rotateY: [0, 0, angle, angle, 0, 0], y: [stackY, stackY, helixY, helixY, stackY, stackY] } : undefined}
         transition={{ duration: T2, times: f([0, out0, out1, in0, in1, T2]), ease: "easeInOut" }}
       >
         <motion.div
           className="size-full rounded-[9px]"
-          initial={{ z: 0 }}
-          animate={{ z: [0, 0, RADIUS, RADIUS, 0, 0] }}
+          initial={{ z: restZ }}
+          animate={play ? { z: [restZ, restZ, RADIUS, RADIUS, restZ, restZ] } : undefined}
           transition={{ duration: T2, times: f([0, out0, out1, in0, in1, T2]), ease: "easeInOut" }}
         >
-          <CardFace tone={palette[i % palette.length]} power={isPower(i)} logo={26} />
+          <CardFace tone={palette[(i === N - 1 ? 0 : i) % palette.length]} power={isPower(i)} logo={26} />
         </motion.div>
       </motion.div>
     );
@@ -188,7 +192,7 @@ function Helix({ palette, onDone }) {
         key={i}
         className="absolute left-1/2 top-1/2 size-1.5 rounded-full bg-gold-soft"
         initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
-        animate={{ x: Math.cos(a) * 96, y: Math.sin(a) * 70, opacity: [0, 1, 0], scale: [0, 1.2, 0] }}
+        animate={play ? { x: Math.cos(a) * 96, y: Math.sin(a) * 70, opacity: [0, 1, 0], scale: [0, 1.2, 0] } : undefined}
         transition={{ delay: 2.15, duration: 0.6, ease: "easeOut" }}
       />
     );
@@ -200,22 +204,28 @@ function Helix({ palette, onDone }) {
         aria-hidden
         className="absolute left-1/2 top-1/2 size-[190px] -translate-x-1/2 -translate-y-1/2 rounded-full"
         style={{ background: "radial-gradient(closest-side, rgb(216 190 140 / 0.55), transparent)" }}
-        animate={{ scale: [0.5, 0.5, 1.15, 1.15, 0.7, 1.5], opacity: [0, 0, 0.9, 0.9, 0.5, 0] }}
+        initial={{ scale: 0.5, opacity: 0 }}
+        animate={play ? { scale: [0.5, 0.5, 1.15, 1.15, 0.7, 1.5], opacity: [0, 0, 0.9, 0.9, 0.5, 0] } : undefined}
         transition={{ duration: T2, times: f([0, 0.15, 0.9, 1.55, 2.1, T2]), ease: "easeInOut" }}
       />
       <motion.div
         aria-hidden
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-        animate={{ opacity: [0, 0, 1, 1, 0, 0], scale: [0.7, 0.7, 1, 1, 0.8, 0.8] }}
+        initial={{ opacity: 0, scale: 0.7 }}
+        animate={play ? { opacity: [0, 0, 1, 1, 0, 0], scale: [0.7, 0.7, 1, 1, 0.8, 0.8] } : undefined}
         transition={{ duration: T2, times: f([0, 0.3, 0.9, 1.55, 2.0, T2]), ease: "easeInOut" }}
       >
         <LogoMark size={56} />
       </motion.div>
       <motion.div
         className="absolute inset-0"
-        style={{ transformStyle: "preserve-3d", rotateX: -14 }}
-        animate={{ rotateY: [0, 0, 720, 720] }}
-        transition={{ duration: T2, times: f([0, 0.2, 2.35, T2]), ease: "easeInOut" }}
+        style={{ transformStyle: "preserve-3d" }}
+        initial={{ rotateX: 0, rotateY: 0 }}
+        animate={play ? { rotateY: [0, 0, 720, 720], rotateX: [0, -14, -14, 0] } : undefined}
+        transition={{
+          rotateY: { duration: T2, times: f([0, 0.2, 2.35, T2]), ease: "easeInOut" },
+          rotateX: { duration: T2, times: f([0, 0.75, 2.0, T2]), ease: "easeInOut" },
+        }}
       >
         {cards}
       </motion.div>
@@ -223,7 +233,7 @@ function Helix({ palette, onDone }) {
         aria-hidden
         className="absolute left-1/2 top-1/2 size-[150px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold-soft"
         initial={{ scale: 0.2, opacity: 0 }}
-        animate={{ scale: [0.2, 1.6], opacity: [0.9, 0] }}
+        animate={play ? { scale: [0.2, 1.6], opacity: [0.9, 0] } : undefined}
         transition={{ delay: 2.1, duration: 0.55, ease: "easeOut" }}
       />
       {sparkles}
@@ -252,13 +262,19 @@ export default function ShuffleIntro({ tones, onDone }) {
       data-act={act}
       className="absolute inset-0 flex flex-col items-center justify-center"
     >
-      <div className="relative h-[320px] w-full max-w-[360px]" style={{ perspective: 1050 }}>
-        {!reduce &&
-          (act === "riffle" ? (
-            <Riffle key="riffle" palette={palette} onDone={toHelix} />
-          ) : (
-            <Helix key="helix" palette={palette} onDone={onDone} />
-          ))}
+      <div className="relative h-[320px] w-full max-w-[360px]">
+        {/* Both acts are mounted up front and swapped by visibility in one frame: mounting the helix at the
+            hand-off cost ~100 ms of main thread, which dropped frames and read as a flicker. */}
+        {!reduce && (
+          <>
+            <div className="absolute inset-0" style={{ visibility: act === "riffle" ? "visible" : "hidden" }}>
+              <Riffle palette={palette} onDone={toHelix} />
+            </div>
+            <div className="absolute inset-0" style={{ visibility: act === "helix" ? "visible" : "hidden", perspective: 1050 }}>
+              <Helix palette={palette} onDone={onDone} play={act === "helix"} />
+            </div>
+          </>
+        )}
       </div>
       <motion.p
         initial={{ opacity: 0, y: 6 }}

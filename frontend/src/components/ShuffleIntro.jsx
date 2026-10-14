@@ -40,10 +40,15 @@ function CardFace({ tone, power, logo }) {
 }
 
 /* ---------------------------- Act 1: riffle ---------------------------- */
-const R1 = { T: 2.1, slide: 0.35, grip: 0.6, drop0: 0.66, step: 0.048, push: 1.4, tap: 1.58, lift: 1.68 };
-const HALF = 52; // halves meet edge to edge: overlapping tilted planes would intersect and bleed through each other
-const HOLD = 24; // halves are held above the table, higher than the finished stack (N * 1.5), so released cards
-                 // always land *below* the cards still in hand and never poke through them
+/*
+ * Cards are NOT in a shared 3D context: each card carries its own perspective + table tilt, and the
+ * layering is explicit (zIndex). That guarantees the order the eye expects, with no plane intersections:
+ *   cards still in hand (100+)  >  card currently falling (between)  >  the pile (0..N-1, last drop on top).
+ * The halves are lifted and spread apart so the pile in the middle is visible while it grows card over card.
+ */
+const R1 = { T: 2.2, slide: 0.35, grip: 0.6, drop0: 0.68, step: 0.052, push: 1.46, tap: 1.56, lift: 1.72 };
+const SPREAD = 74; // half-deck centre offset; leaves the middle of the table open for the pile
+const TILT = 50; // table tilt (rotateX) while on the table
 const RIFFLE_W = 104;
 const RIFFLE_H = 146;
 
@@ -52,7 +57,7 @@ function Riffle({ palette, onDone }) {
     const id = setTimeout(onDone, R1.T * 1000);
     const ticks = [];
     if (navigator.vibrate) {
-      for (let k = 0; k < N; k++) ticks.push(setTimeout(() => navigator.vibrate(3), (R1.drop0 + k * R1.step) * 1000));
+      for (let k = 0; k < N; k++) ticks.push(setTimeout(() => navigator.vibrate(3), (R1.drop0 + k * R1.step + 0.08) * 1000));
       ticks.push(setTimeout(() => navigator.vibrate(12), R1.tap * 1000));
     }
     return () => {
@@ -65,10 +70,13 @@ function Riffle({ palette, onDone }) {
   const cards = [];
   for (const s of [-1, 1]) {
     for (let j = 0; j < N / 2; j++) {
+      // released from the bottom of each half, alternating left/right
       const k = j * 2 + (s > 0 ? 1 : 0);
       const d = R1.drop0 + k * R1.step;
-      const restZ = j * 1.5;
-      const stackZ = k * 1.5;
+      const handY = -j * 1.6; // thickness of the half in hand
+      const pileY = 22 - k * 1.4; // the pile grows upward, in front of the halves
+      const pileX = s * 7; // alternate sides stay slightly offset so the interleave reads
+      const hinge = s < 0 ? 0 : 1;
       cards.push(
         <motion.div
           key={k}
@@ -78,19 +86,26 @@ function Riffle({ palette, onDone }) {
             height: RIFFLE_H,
             marginLeft: -RIFFLE_W / 2,
             marginTop: -RIFFLE_H / 2,
-            transformOrigin: s < 0 ? "0% 50%" : "100% 50%", // hinge on the outer edge so the inner corner lifts
+            transformPerspective: 900,
+            originY: 0.5,
           }}
-          initial={{ opacity: 0, x: s * 170, z: restZ }}
+          initial={{ opacity: 0, x: s * 190, y: handY, rotateX: TILT, rotateY: 0, scale: 1, zIndex: 100 + j, originX: s < 0 ? 0 : 1 }}
           animate={{
             opacity: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            // released in place (interleaving in the overlap), then both halves are pushed together
-            x: [s * 170, s * HALF, s * HALF, s * HALF, s * HALF, s * HALF, 0, 0, 0, 0],
-            z: [restZ, restZ, HOLD + restZ, HOLD + restZ, stackZ, stackZ, stackZ, stackZ + 9, stackZ, stackZ],
-            rotateY: [0, 0, s * 20, s * 20, 0, 0, 0, 0, 0, 0],
+            x: [s * 190, s * SPREAD, s * SPREAD, s * SPREAD, pileX, pileX, 0, 0, 0, 0],
+            y: [handY, handY, handY - 30, handY - 30, pileY, pileY, pileY, pileY - 8, pileY, -k * 0.8],
+            rotateY: [0, 0, s * 16, s * 16, 0, 0, 0, 0, 0, 0],
+            rotateX: [TILT, TILT, TILT, TILT, TILT, TILT, TILT, TILT, TILT, 0],
+            scale: [1, 1, 1, 1, 1, 1, 1, 1, 1, 0.62],
+            // in hand above everything, then onto the pile in drop order (each new card lands on top)
+            zIndex: [100 + j, 100 + j, 100 + j, 100 + j, k, k, k, k, k, k],
+            // hinge on the outer edge while in hand (the inner corner lifts); back to the centre once the halves
+            // are pushed together, otherwise the final shrink would pull each half toward its own edge and split the deck
+            originX: [hinge, hinge, hinge, hinge, hinge, hinge, 0.5, 0.5, 0.5, 0.5],
           }}
           transition={{
             duration: R1.T,
-            times: f([0, R1.slide, R1.grip, d - 0.02, d + 0.08, R1.push, R1.push + 0.12, R1.tap, R1.tap + 0.06, R1.T]),
+            times: f([0, R1.slide, R1.grip, d, d + 0.1, R1.push, R1.push + 0.08, R1.tap, R1.lift, R1.T]),
             ease: "easeInOut",
           }}
         >
@@ -106,21 +121,12 @@ function Riffle({ palette, onDone }) {
       {/* contact shadow on the table */}
       <motion.div
         aria-hidden
-        className="absolute left-1/2 top-1/2 h-[96px] w-[250px] -translate-x-1/2 -translate-y-1/2 rounded-[50%]"
-        style={{ background: "radial-gradient(closest-side, rgb(31 36 51 / 0.26), transparent)", marginTop: 14 }}
-        animate={{ scaleX: [1.25, 1, 1, 0.8, 0.8, 0.5], opacity: [0, 0.8, 0.8, 1, 1, 0] }}
+        className="absolute left-1/2 top-1/2 h-[96px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-[50%]"
+        style={{ background: "radial-gradient(closest-side, rgb(31 36 51 / 0.24), transparent)", marginTop: 30 }}
+        animate={{ scaleX: [1.25, 1, 1, 0.7, 0.7, 0.4], opacity: [0, 0.8, 0.8, 1, 1, 0] }}
         transition={{ duration: R1.T, times: f([0, R1.slide, R1.grip, R1.tap, R1.lift, R1.T]), ease: "easeInOut" }}
       />
-      {/* table plane; at the end it tilts up to face the viewer and shrinks to the helix card size */}
-      <motion.div
-        className="absolute inset-0"
-        style={{ transformStyle: "preserve-3d" }}
-        initial={{ rotateX: 54, scale: 1 }}
-        animate={{ rotateX: [54, 54, 0], scale: [1, 1, 0.62] }}
-        transition={{ duration: R1.T, times: f([0, R1.lift, R1.T]), ease: [0.4, 0, 0.2, 1] }}
-      >
-        {cards}
-      </motion.div>
+      {cards}
     </>
   );
 }

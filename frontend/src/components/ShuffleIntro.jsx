@@ -40,7 +40,8 @@ function CardFace({ tone, power, logo }) {
 }
 
 /* ---------------------------- Act 1: riffle ---------------------------- */
-const R1 = { T: 2.05, slide: 0.35, grip: 0.6, drop0: 0.66, step: 0.048, tap: 1.5, lift: 1.62 };
+const R1 = { T: 2.1, slide: 0.35, grip: 0.6, drop0: 0.66, step: 0.048, push: 1.4, tap: 1.58, lift: 1.68 };
+const HALF = 44; // halves overlap by ~16px at their inner corners, where the cards interleave
 const RIFFLE_W = 104;
 const RIFFLE_H = 146;
 
@@ -75,18 +76,19 @@ function Riffle({ palette, onDone }) {
             height: RIFFLE_H,
             marginLeft: -RIFFLE_W / 2,
             marginTop: -RIFFLE_H / 2,
-            transformOrigin: s < 0 ? "100% 50%" : "0% 50%", // tilt around the inner edge
+            transformOrigin: s < 0 ? "0% 50%" : "100% 50%", // hinge on the outer edge so the inner corner lifts
           }}
           initial={{ opacity: 0, x: s * 170, z: restZ }}
           animate={{
-            opacity: [0, 1, 1, 1, 1, 1, 1, 1, 1],
-            x: [s * 170, s * 60, s * 60, s * 60, 0, 0, 0, 0, 0],
-            z: [restZ, restZ, restZ + 8, restZ + 8, stackZ, stackZ, stackZ + 9, stackZ, stackZ],
-            rotateY: [0, 0, s * 17, s * 17, 0, 0, 0, 0, 0],
+            opacity: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            // released in place (interleaving in the overlap), then both halves are pushed together
+            x: [s * 170, s * HALF, s * HALF, s * HALF, s * HALF, s * HALF, 0, 0, 0, 0],
+            z: [restZ, restZ, restZ, restZ, stackZ, stackZ, stackZ, stackZ + 9, stackZ, stackZ],
+            rotateY: [0, 0, s * 20, s * 20, 0, 0, 0, 0, 0, 0],
           }}
           transition={{
             duration: R1.T,
-            times: f([0, R1.slide, R1.grip, d - 0.02, d + 0.07, 1.42, R1.tap, 1.58, R1.T]),
+            times: f([0, R1.slide, R1.grip, d - 0.02, d + 0.08, R1.push, R1.push + 0.12, R1.tap, R1.tap + 0.06, R1.T]),
             ease: "easeInOut",
           }}
         >

@@ -141,9 +141,11 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
-- 2026-10-14 - v1.3: two-handed riffle-shuffle intro on a 3D table (`ShuffleIntro.jsx`, ~2.9 s: slide-in, grip + corner lift, alternating cascade, bridge arch, tap-square; shadow, layered human hands (`Hands.jsx`: base under the deck, thumb over it); tap to skip, colours from the chosen
-  categories, haptic ticks, reduced-motion fallback) before every deal; snappier springs (flip ~0.3 s, card exit ~0.3 s,
-  screen transitions 0.16 s).
+- 2026-10-14 - v1.3: hand-free "open heart" shuffle intro (`ShuffleIntro.jsx`, 3 s): the deck blooms into a spinning
+  3D helix of 14 category-coloured cards around the logo, then spirals back into one stack with a golden pulse and
+  sparkles. Each card is two nested motion layers (outer rotateY+y = position on ring, inner translateZ = radius) so
+  transforms compose radially. Tap to skip, haptic ticks, reduced-motion fallback. Snappier springs (flip ~0.3 s,
+  card exit ~0.3 s, screen transitions 0.16 s).
 - 2026-10-14 — v1.2: categories mixed in one shuffled deck; power cards more frequent (every 3-5 cards, ~19%) and
   15 power cards (was 9); all long dashes removed from copy.
 - 2026-10-14 — v1.1: stacked-deck animation choreography (deal-in, lean, throw/arc, undo return, lifted flip);

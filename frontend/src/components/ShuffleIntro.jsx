@@ -1,32 +1,46 @@
 import { useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import { LogoMark } from "./Logo.jsx";
 import { toneOf } from "../lib/icons.js";
-import { HandBase, HandThumb } from "./Hands.jsx";
 
 /**
- * Riffle shuffle on a 3D table: halves slide in, hands grip and bend the inner corners up,
- * cards cascade alternately into the middle, the stack bridges (arches) and is squared with a tap.
- * Choreography is one shared timeline (seconds); every card/hand animates against the same `times`.
+ * "Open heart" shuffle: the deck blooms into a spinning helix of cards around the logo,
+ * the colours of the chosen categories weave together, then everything spirals back into one
+ * stack with a golden pulse. One shared timeline (seconds), every card is staggered against it.
  */
-const PER_SIDE = 8;
-const N = PER_SIDE * 2;
-const T = 2.9;
-const CARD_W = 104;
-const CARD_H = 146;
-const HALF_X = 60;
-const STEP = 0.058; // seconds between consecutive card drops
-const TL = { slide: 0.5, grip: 0.9, drop0: 1.0, bridge: 2.0, bridgeEnd: 2.3, tap: 2.5 };
-const lastDrop = TL.drop0 + (N - 1) * STEP;
+const N = 14;
+const T = 3.0;
+const R = 118; // ring radius
+const CARD_W = 64;
+const CARD_H = 90;
+const frac = (arr) => arr.map((t) => Math.min(t / T, 1));
+
+function MiniCard({ tone }) {
+  return (
+    <div
+      className="relative size-full rounded-[9px]"
+      style={{
+        background: `linear-gradient(155deg, ${tone.from}, ${tone.to})`,
+        boxShadow: "0 0 0 0.5px rgb(0 0 0 / 0.16), 0 3px 8px rgb(31 36 51 / 0.2)",
+      }}
+    >
+      <div className="absolute inset-[4px] rounded-[6px] border border-white/45" />
+      <div className="absolute inset-0 flex items-center justify-center opacity-80">
+        <LogoMark size={26} />
+      </div>
+    </div>
+  );
+}
 
 export default function ShuffleIntro({ tones, onDone }) {
   const reduce = useReducedMotion();
 
   useEffect(() => {
-    const id = setTimeout(onDone, reduce ? 250 : T * 1000 + 100);
+    const id = setTimeout(onDone, reduce ? 250 : T * 1000 + 80);
     const ticks = [];
     if (!reduce && navigator.vibrate) {
-      for (let k = 0; k < N; k++) ticks.push(setTimeout(() => navigator.vibrate(3), (TL.drop0 + k * STEP) * 1000));
-      ticks.push(setTimeout(() => navigator.vibrate(12), TL.tap * 1000));
+      ticks.push(setTimeout(() => navigator.vibrate(8), 500));
+      ticks.push(setTimeout(() => navigator.vibrate([6, 30, 14]), 2500));
     }
     return () => {
       clearTimeout(id);
@@ -35,81 +49,58 @@ export default function ShuffleIntro({ tones, onDone }) {
   }, [onDone, reduce]);
 
   const palette = (tones.length ? tones : ["sand"]).map(toneOf);
-  const frac = (arr) => arr.map((t) => Math.min(t / T, 1));
 
-  const cards = [];
-  for (const s of [-1, 1]) {
-    for (let j = 0; j < PER_SIDE; j++) {
-      const k = j * 2 + (s > 0 ? 1 : 0);
-      const tone = palette[(j + (s > 0 ? 1 : 0)) % palette.length];
-      const drop = TL.drop0 + k * STEP;
-      const restZ = j * 1.5;
-      const stackZ = k * 1.5;
-      const arch = 15 * Math.sin((Math.PI * (k + 0.5)) / N); // bridge curvature for this card
-      const lift = 8;
-      cards.push(
+  const cards = Array.from({ length: N }, (_, i) => {
+    const tone = palette[i % palette.length];
+    const angle = (i * 360) / N;
+    const out0 = 0.35 + i * 0.03;
+    const out1 = out0 + 0.7;
+    const in0 = 1.85 + (N - 1 - i) * 0.025;
+    const in1 = in0 + 0.55;
+    const times = frac([0, out0, out1, in0, in1, T]);
+    const helixY = (i - (N - 1) / 2) * 7;
+    const stackY = -i * 1.3;
+    return (
+      <motion.div
+        key={i}
+        className="absolute left-1/2 top-1/2"
+        style={{ width: CARD_W, height: CARD_H, marginLeft: -CARD_W / 2, marginTop: -CARD_H / 2, transformStyle: "preserve-3d" }}
+        initial={{ rotateY: 0, y: stackY }}
+        animate={
+          reduce
+            ? { rotateY: 0, y: stackY }
+            : { rotateY: [0, 0, angle, angle, 0, 0], y: [stackY, stackY, helixY, helixY, stackY, stackY] }
+        }
+        transition={{ duration: T, times, ease: "easeInOut" }}
+      >
         <motion.div
-          key={`${s}-${j}`}
-          className="absolute left-1/2 top-1/2 rounded-[10px]"
-          style={{
-            width: CARD_W,
-            height: CARD_H,
-            marginLeft: -CARD_W / 2,
-            marginTop: -CARD_H / 2,
-            background: `linear-gradient(155deg, ${tone.from}, ${tone.to})`,
-            boxShadow: "0 0 0 0.5px rgb(0 0 0 / 0.18), 0 1px 2px rgb(0 0 0 / 0.18)",
-            transformOrigin: s < 0 ? "100% 50%" : "0% 50%", // tilt around the inner edge
-          }}
-          initial={{ opacity: 0, x: s * 170, z: restZ }}
+          className="size-full"
+          initial={{ z: 0, opacity: 0, scale: 0.9 }}
           animate={
             reduce
-              ? { opacity: 1, x: 0, z: stackZ }
-              : {
-                  opacity: [0, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                  x: [s * 170, s * HALF_X, s * HALF_X, s * HALF_X, 0, 0, 0, 0, 0, 0],
-                  z: [restZ, restZ, restZ + lift, restZ + lift, stackZ, stackZ, stackZ + 10 + arch * 0.4, stackZ + 2, stackZ + 7, stackZ],
-                  rotateY: [0, 0, s * 17, s * 17, 0, 0, 0, 0, 0, 0],
-                  rotateX: [0, 0, 0, 0, 0, 0, -arch, 0, 0, 0],
-                }
+              ? { z: 0, opacity: 1, scale: 1 }
+              : { z: [0, 0, R, R, 0, 0], opacity: [0, 1, 1, 1, 1, 1], scale: [0.9, 1, 1, 1, 1, 1] }
           }
-          transition={{
-            duration: T,
-            times: frac([0, TL.slide, TL.grip, drop - 0.02, drop + 0.07, TL.bridge - 0.05, TL.bridge + 0.15, TL.bridgeEnd, TL.tap - 0.04 + 0.04, T]),
-            ease: "easeInOut",
-          }}
+          transition={{ duration: T, times: frac([0, 0.12, out1, in0, in1, T]), ease: "easeInOut" }}
         >
-          <div className="absolute inset-[5px] rounded-[7px] border border-white/40" />
+          <MiniCard tone={tone} />
         </motion.div>
-      );
-    }
-  }
+      </motion.div>
+    );
+  });
 
-  // Hands rest under the deck (base layer) with the thumb pressing on top of it (front layer).
-  const handMotion = (s) =>
-    reduce
-      ? { opacity: 0 }
-      : {
-          x: [s * 230, 0, 0, -s * 8, -s * 18, -s * 18, 0, s * 230],
-          y: [70, 0, -4, 0, -10, 0, 6, 80],
-          opacity: [0, 1, 1, 1, 1, 1, 1, 0],
-        };
-  const handTransition = {
-    duration: T,
-    times: frac([0, TL.slide, TL.grip, lastDrop, TL.bridge + 0.1, TL.bridgeEnd, TL.tap, T]),
-    ease: "easeInOut",
-  };
-  const hand = (s, layer) => (
-    <motion.div
-      key={`${layer}-${s}`}
-      className="pointer-events-none absolute left-1/2 top-1/2"
-      style={{ marginLeft: s < 0 ? -157 : 7, marginTop: -33, zIndex: layer === "base" ? 5 : 40 }}
-      initial={{ x: s * 230, y: 70, opacity: 0 }}
-      animate={handMotion(s)}
-      transition={handTransition}
-    >
-      {layer === "base" ? <HandBase mirrored={s > 0} /> : <HandThumb mirrored={s > 0} />}
-    </motion.div>
-  );
+  const sparkles = Array.from({ length: 12 }, (_, i) => {
+    const a = (i / 12) * Math.PI * 2;
+    return (
+      <motion.span
+        key={i}
+        className="absolute left-1/2 top-1/2 size-1.5 rounded-full bg-gold-soft"
+        initial={{ x: 0, y: 0, opacity: 0, scale: 0 }}
+        animate={reduce ? undefined : { x: Math.cos(a) * 96, y: Math.sin(a) * 70, opacity: [0, 1, 0], scale: [0, 1.2, 0] }}
+        transition={{ delay: 2.55, duration: 0.6, ease: "easeOut" }}
+      />
+    );
+  });
 
   return (
     <button
@@ -119,20 +110,44 @@ export default function ShuffleIntro({ tones, onDone }) {
       data-testid="shuffle"
       className="absolute inset-0 flex flex-col items-center justify-center"
     >
-      <div className="relative h-[300px] w-full max-w-[360px]" style={{ perspective: 1100 }}>
-        {/* contact shadow on the table */}
+      <div className="relative h-[320px] w-full max-w-[360px]" style={{ perspective: 1000 }}>
+        {/* halo behind the logo */}
         <motion.div
           aria-hidden
-          className="absolute left-1/2 top-1/2 h-[96px] w-[250px] -translate-x-1/2 -translate-y-1/2 rounded-[50%]"
-          style={{ background: "radial-gradient(closest-side, rgb(31 36 51 / 0.26), transparent)", marginTop: 14 }}
-          animate={reduce ? undefined : { scaleX: [1.25, 1, 1, 0.8, 0.9, 0.85, 0.8], opacity: [0, 0.8, 0.8, 1, 0.8, 1, 1] }}
-          transition={{ duration: T, times: frac([0, TL.slide, TL.grip, TL.bridge, TL.bridgeEnd, TL.tap, T]), ease: "easeInOut" }}
+          className="absolute left-1/2 top-1/2 size-[190px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+          style={{ background: "radial-gradient(closest-side, rgb(216 190 140 / 0.55), transparent)" }}
+          animate={reduce ? undefined : { scale: [0.5, 0.5, 1.15, 1.15, 0.7, 1.5], opacity: [0, 0, 0.9, 0.9, 0.5, 0] }}
+          transition={{ duration: T, times: frac([0, 0.3, 1.2, 1.9, 2.5, T]), ease: "easeInOut" }}
         />
-        {[-1, 1].map((s) => hand(s, "base"))}
-        <div className="absolute inset-0" style={{ transformStyle: "preserve-3d", transform: "rotateX(54deg)", zIndex: 20 }}>
+        {/* logo sits in the middle of the ring */}
+        <motion.div
+          aria-hidden
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          animate={reduce ? undefined : { opacity: [0, 0, 1, 1, 0, 0], scale: [0.7, 0.7, 1, 1, 0.8, 0.8] }}
+          transition={{ duration: T, times: frac([0, 0.5, 1.2, 1.9, 2.4, T]), ease: "easeInOut" }}
+        >
+          <LogoMark size={56} />
+        </motion.div>
+
+        {/* the helix */}
+        <motion.div
+          className="absolute inset-0"
+          style={{ transformStyle: "preserve-3d", rotateX: -14 }}
+          animate={reduce ? undefined : { rotateY: [0, 0, 720, 720] }}
+          transition={{ duration: T, times: frac([0, 0.45, 2.7, T]), ease: "easeInOut" }}
+        >
           {cards}
-        </div>
-        {[-1, 1].map((s) => hand(s, "thumb"))}
+        </motion.div>
+
+        {/* golden pulse + sparkles when the stack closes */}
+        <motion.div
+          aria-hidden
+          className="absolute left-1/2 top-1/2 size-[150px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-gold-soft"
+          initial={{ scale: 0.2, opacity: 0 }}
+          animate={reduce ? undefined : { scale: [0.2, 1.6], opacity: [0.9, 0] }}
+          transition={{ delay: 2.5, duration: 0.55, ease: "easeOut" }}
+        />
+        {sparkles}
       </div>
       <motion.p
         initial={{ opacity: 0, y: 6 }}

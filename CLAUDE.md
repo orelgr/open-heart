@@ -15,9 +15,9 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 - **One request** (`/api/content`) returns categories + questions + power cards + rules. The client caches it in
   `localStorage` (stale-while-revalidate, `src/lib/api.js`), so every screen after first load renders instantly.
 - Routing is a 20-line hash router (`src/lib/router.js`): `#/`, `#/rules`, `#/select`, `#/play`. Browser back works.
-- Deck building (`src/lib/deck.js`): selected categories in their `order` (light → deep), questions shuffled
-  within each, power cards inserted after ≥ `meta.powerCardMinGap` questions (random by `powerCardChance`,
-  guaranteed by 2×gap).
+- Deck building (`src/lib/deck.js`): questions from all selected categories are shuffled **together** (mixed),
+  and a power card is dealt every `meta.powerCardMinGap`..`powerCardMaxGap` questions (3..5, never consecutive,
+  none as the last card). Power cards are drawn without repetition until all 15 were used.
 - PWA: `public/manifest.webmanifest`, `public/sw.js` (navigations + API network-first, static assets cache-first),
   registered only in production builds.
 
@@ -33,7 +33,7 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 Env vars: `HOST` (0.0.0.0), `PORT` (8000), `RELOAD` (1 = auto-reload), `CORS_ORIGINS` (comma list, default `*`).
 
 ### questions.json schema
-`meta{powerCardChance,powerCardMinGap}` · `categories[{id,order,title,subtitle,icon,tone,questions[]}]` (6 × 15)
+`meta{powerCardMinGap,powerCardMaxGap}` · `categories[{id,order,title,subtitle,icon,tone,questions[]}]` (6 × 15)
 · `powerCards[{id,type:"challenge"|"power",title,icon,text,seconds?}]` · `rules{intro,steps[{icon,title,text}],etiquette[],powerIntro}`.
 `icon` = lucide-react name, mapped in `src/lib/icons.js` (add new names there). `tone` ∈ sand|gold|sage|sky|clay|plum.
 To add content, edit only the JSON — no frontend change needed.
@@ -141,6 +141,8 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-10-14 — v1.2: categories mixed in one shuffled deck; power cards more frequent (every 3-5 cards, ~19%) and
+  15 power cards (was 9); all long dashes removed from copy.
 - 2026-10-14 — v1.1: stacked-deck animation choreography (deal-in, lean, throw/arc, undo return, lifted flip);
   home subtitle split to two lines without dash; production domain → gmarup.com.
 - 2026-10-14 — v1.0.0: backend (FastAPI + 90 questions, 9 power cards, rules), frontend (home, rules page,

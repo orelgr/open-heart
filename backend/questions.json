@@ -3,8 +3,8 @@
     "name": "לבבות פתוחים",
     "brand": "Open Heart",
     "version": "1.0.0",
-    "powerCardChance": 0.14,
-    "powerCardMinGap": 4
+    "powerCardMinGap": 3,
+    "powerCardMaxGap": 5
   },
   "categories": [
     {
@@ -225,6 +225,51 @@
       "title": "קלף השאלה שלי",
       "icon": "MessageCircleQuestion",
       "text": "במקום הקלף הבא, שאל/י שאלה משלך שמסקרנת אותך."
+    },
+    {
+      "id": "ten-seconds-5",
+      "type": "challenge",
+      "title": "אתגר 10 שניות",
+      "icon": "Timer",
+      "text": "שלושה מקומות שאת/ה חולם/ת לבקר בהם, לפני שהשעון נגמר!",
+      "seconds": 10
+    },
+    {
+      "id": "ten-seconds-6",
+      "type": "challenge",
+      "title": "אתגר 10 שניות",
+      "icon": "Timer",
+      "text": "תנו אחד לשני מחמאה כנה אחת. יש לכם 10 שניות.",
+      "seconds": 10
+    },
+    {
+      "id": "ten-seconds-7",
+      "type": "challenge",
+      "title": "אתגר 10 שניות",
+      "icon": "Timer",
+      "text": "תארו את היום המושלם שלכם במשפט אחד.",
+      "seconds": 10
+    },
+    {
+      "id": "moment",
+      "type": "power",
+      "title": "קלף הרגע",
+      "icon": "Sparkles",
+      "text": "עצרו לרגע, קחו נשימה ואמרו מה הכי נעים לכם בשיחה עד עכשיו."
+    },
+    {
+      "id": "choice",
+      "type": "power",
+      "title": "קלף הבחירה",
+      "icon": "Repeat",
+      "text": "בחר/י מי משניכם עונה ראשון על השאלה הבאה."
+    },
+    {
+      "id": "memory",
+      "type": "power",
+      "title": "קלף הזיכרון",
+      "icon": "HandHeart",
+      "text": "שתפו רגע טוב אחד שהיה לכם בשבוע האחרון."
     }
   ],
   "rules": {

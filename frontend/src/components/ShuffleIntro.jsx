@@ -92,7 +92,8 @@ function Riffle({ palette, onDone }) {
             ease: "easeInOut",
           }}
         >
-          <CardFace tone={palette[k % palette.length]} power={isPower(k)} logo={34} />
+          {/* the top card of both halves shares one colour, so the deck reads as one deck being split */}
+          <CardFace tone={palette[(j === N / 2 - 1 ? 0 : k) % palette.length]} power={isPower(k)} logo={34} />
         </motion.div>
       );
     }

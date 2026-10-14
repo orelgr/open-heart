@@ -141,6 +141,9 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-10-14 - v1.4: shuffle intro is now two acts (~4.7 s, `ShuffleIntro.jsx`): a 3D table riffle (split, corner lift,
+  alternating cascade, tap-square, then the table tilts up and shrinks) hands off to the helix bloom. Dark power cards
+  (night + gold bolt, every 4th card) appear in both acts.
 - 2026-10-14 - v1.3: hand-free "open heart" shuffle intro (`ShuffleIntro.jsx`, 3 s): the deck blooms into a spinning
   3D helix of 14 category-coloured cards around the logo, then spirals back into one stack with a golden pulse and
   sparkles. Each card is two nested motion layers (outer rotateY+y = position on ring, inner translateZ = radius) so

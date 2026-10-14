@@ -38,8 +38,8 @@ export function Screen({ children, className = "" }) {
     <motion.main
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, transition: { duration: 0.1 } }}
-      transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
+      exit={{ opacity: 0, transition: { duration: 0.07 } }}
+      transition={{ duration: 0.16, ease: [0.25, 0.1, 0.25, 1] }}
       className={`relative mx-auto flex h-dvh w-full max-w-md flex-col px-5 safe-top safe-bottom ${className}`}
     >
       {children}

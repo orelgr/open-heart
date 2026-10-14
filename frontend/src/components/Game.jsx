@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
 import { BookOpen, ChevronRight, LayoutGrid, RotateCcw, Undo2 } from "lucide-react";
 import Card from "./Card.jsx";
+import ShuffleIntro from "./ShuffleIntro.jsx";
 import { RulesSheet } from "./Rules.jsx";
 import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { LogoMark } from "./Logo.jsx";
@@ -13,6 +14,9 @@ export default function Game({ content, deck, onRestart }) {
   const exitDirs = useRef([]);
   const progress = useMotionValue(0); // 0..1 drag distance of the top card
   const [rulesOpen, setRulesOpen] = useState(false);
+  const [shuffling, setShuffling] = useState(true);
+  const tones = [...new Set(deck.filter((c) => c.kind === "question").map((c) => c.category.tone))];
+  const finishShuffle = useCallback(() => setShuffling(false), []);
 
   const done = index >= deck.length;
   const questionsTotal = deck.filter((c) => c.kind === "question").length;
@@ -78,7 +82,9 @@ export default function Game({ content, deck, onRestart }) {
       {/* Deck */}
       <div className="relative flex flex-1 items-center justify-center py-6">
         <div className="relative aspect-[5/7] w-full max-w-[340px] max-h-full">
-          {done ? (
+          {shuffling ? (
+            <ShuffleIntro tones={tones} onDone={finishShuffle} />
+          ) : done ? (
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -89,7 +95,7 @@ export default function Game({ content, deck, onRestart }) {
               <h2 className="font-display text-[30px]">סיימתם את החפיסה</h2>
               <p className="text-[15px] leading-relaxed text-muted">כל שיחה טובה מתחילה בשאלה אחת. תודה שהקשבתם.</p>
               <div className="mt-2 flex w-full flex-col gap-2">
-                <Button onClick={() => { onRestart(); setNav({ mode: "start", dir: -1, dragged: false, backFrom: -1 }); setIndex(0); }}>
+                <Button onClick={() => { onRestart(); setNav({ mode: "start", dir: -1, dragged: false, backFrom: -1 }); setIndex(0); setShuffling(true); }}>
                   <RotateCcw size={18} /> ערבוב ומשחק חדש
                 </Button>
                 <Button variant="ghost" onClick={() => navigate("/select")}>
@@ -107,7 +113,7 @@ export default function Game({ content, deck, onRestart }) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className={`flex flex-col gap-3 transition-opacity duration-200 ${shuffling ? "pointer-events-none opacity-0" : ""}`}>
         <div className="flex h-11 items-center justify-between">
           <span className="w-11" />
           <p className="text-[13px] text-muted">{done ? "" : "הקישו להפיכה · החליקו להמשך"}</p>

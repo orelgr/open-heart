@@ -7,8 +7,8 @@ import { iconFor, toneOf } from "../lib/icons.js";
 
 const SWIPE_DISTANCE = 110;
 const SWIPE_VELOCITY = 600;
-const flipSpring = { type: "spring", stiffness: 210, damping: 22, mass: 0.9 };
-const settle = { type: "spring", stiffness: 300, damping: 28, mass: 0.8 };
+const flipSpring = { type: "spring", stiffness: 520, damping: 36, mass: 0.8 };
+const settle = { type: "spring", stiffness: 560, damping: 38, mass: 0.7 };
 const OFF = () => (typeof window === "undefined" ? 600 : Math.max(window.innerWidth, 420) + 160);
 
 /** Resting pose for each layer of the stack (0 = top). */
@@ -35,24 +35,24 @@ const variants = {
     ...layer(depth),
     transition:
       nav.mode === "start"
-        ? { type: "spring", stiffness: 170, damping: 20, delay: 0.08 + (2 - depth) * 0.09 }
-        : { ...settle, delay: nav.mode === "next" ? depth * 0.035 : 0 },
+        ? { type: "spring", stiffness: 300, damping: 26, delay: 0.04 + (2 - depth) * 0.06 }
+        : { ...settle, delay: nav.mode === "next" ? depth * 0.015 : 0 },
   }),
   exit: (nav) => {
-    if (nav.mode === "back") return { ...layer(3), y: 54, scale: 0.84, transition: { duration: 0.25 } };
+    if (nav.mode === "back") return { ...layer(3), y: 54, scale: 0.84, transition: { duration: 0.16 } };
     const d = nav.dir;
     return nav.dragged
       ? // Thrown: keep the momentum, arc slightly upward and spin out.
-        { zIndex: 30, x: d * OFF(), y: -50, rotate: d * 26, opacity: 1, transition: { duration: 0.42, ease: [0.22, 0.61, 0.36, 1] } }
+        { zIndex: 30, x: d * OFF(), y: -50, rotate: d * 26, opacity: 1, transition: { duration: 0.26, ease: [0.2, 0.7, 0.3, 1] } }
       : // Button: a small anticipation lift, then glide off along an arc.
         {
           zIndex: 30,
-          x: [null, -d * 18, d * OFF()],
+          x: [null, -d * 12, d * OFF()],
           y: [null, -14, -60],
           rotate: [null, -d * 3, d * 22],
           scale: [null, 1.04, 1],
           opacity: 1,
-          transition: { duration: 0.58, times: [0, 0.22, 1], ease: [0.45, 0, 0.2, 1] },
+          transition: { duration: 0.34, times: [0, 0.16, 1], ease: [0.4, 0, 0.2, 1] },
         };
   },
 };
@@ -157,7 +157,7 @@ export default function Card({ item, depth, nav, onSwipe, progress }) {
     setFlipped((f) => !f);
     navigator.vibrate?.(8);
     // Lift off the table while turning, then settle.
-    animateLift(lift.current, { scale: [1, 1.07, 1], y: [0, -12, 0] }, { duration: 0.6, ease: [0.33, 0, 0.2, 1] });
+    animateLift(lift.current, { scale: [1, 1.05, 1], y: [0, -8, 0] }, { duration: 0.36, ease: [0.33, 0, 0.2, 1] });
   };
 
   return (
@@ -172,7 +172,7 @@ export default function Card({ item, depth, nav, onSwipe, progress }) {
       drag={isTop ? "x" : false}
       dragSnapToOrigin
       dragElastic={0.85}
-      dragTransition={{ bounceStiffness: 380, bounceDamping: 24 }}
+      dragTransition={{ bounceStiffness: 600, bounceDamping: 32 }}
       whileDrag={{ scale: 1.03 }}
       onDragEnd={(_, info) => {
         if (Math.abs(info.offset.x) > SWIPE_DISTANCE || Math.abs(info.velocity.x) > SWIPE_VELOCITY) {

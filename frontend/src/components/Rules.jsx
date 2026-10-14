@@ -88,7 +88,7 @@ export default function RulesPage({ content }) {
       </div>
       <div className="flex-1 overflow-y-auto px-5 pb-6">
         <h1 className="mb-1 mt-4 font-display text-[40px] leading-tight">איך משחקים</h1>
-        <p className="mb-6 text-[15px] text-muted">כמה דקות של קריאה — לשיחה של שעות.</p>
+        <p className="mb-6 text-[15px] text-muted">כמה דקות של קריאה, לשיחה של שעות.</p>
         <RulesContent content={content} />
       </div>
       <div className="px-5 pt-3">

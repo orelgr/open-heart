@@ -18,7 +18,7 @@ export async function fetchContent() {
   try {
     localStorage.setItem(KEY, JSON.stringify(data));
   } catch {
-    /* storage unavailable — fine */
+    /* storage unavailable - fine */
   }
   return data;
 }

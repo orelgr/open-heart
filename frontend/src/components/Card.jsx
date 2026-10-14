@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { motion, useAnimate, useMotionValue, useMotionValueEvent, useTransform } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { animate, motion, useAnimate, useMotionValue, useMotionValueEvent, useTransform } from "framer-motion";
 import { Zap } from "lucide-react";
 import { LogoMark } from "./Logo.jsx";
 import Timer from "./Timer.jsx";
@@ -60,11 +60,11 @@ const variants = {
 const faceBase = "absolute inset-0 overflow-hidden rounded-[var(--radius-card)] backface-hidden";
 
 /** Card back (face-down side). */
-export function CardBack({ item, hidden = false }) {
-  const pe = hidden ? { pointerEvents: "none" } : undefined;
+export function CardBack({ item, hidden = false, visibility }) {
+  const pe = { pointerEvents: hidden ? "none" : undefined, visibility };
   if (item.kind === "power") {
     return (
-      <div className={`${faceBase} flex flex-col items-center justify-center gap-5 bg-night text-white`} style={pe}>
+      <motion.div className={`${faceBase} flex flex-col items-center justify-center gap-5 bg-night text-white`} style={pe}>
         <div className="pointer-events-none absolute inset-3 rounded-[22px] border border-gold-soft/30" />
         <motion.div
           animate={{ opacity: [0.6, 1, 0.6], scale: [1, 1.06, 1] }}
@@ -75,13 +75,13 @@ export function CardBack({ item, hidden = false }) {
         </motion.div>
         <p className="font-display text-3xl">קלף כוח</p>
         <p className="text-sm tracking-wide text-white/55">הקישו לחשיפה</p>
-      </div>
+      </motion.div>
     );
   }
   const tone = toneOf(item.category.tone);
   const Icon = iconFor(item.category.icon);
   return (
-    <div
+    <motion.div
       className={`${faceBase} flex flex-col items-center justify-between p-7 text-white`}
       style={{ ...pe, background: `linear-gradient(155deg, ${tone.from} 0%, ${tone.to} 100%)` }}
     >
@@ -90,21 +90,21 @@ export function CardBack({ item, hidden = false }) {
         <Icon size={15} strokeWidth={1.8} />
         {item.category.title}
       </div>
-      <div className="flex size-28 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm">
+      <div className="flex size-28 items-center justify-center rounded-full bg-white/25">
         <LogoMark size={64} />
       </div>
       <p className="pb-2 text-[13px] tracking-wide" style={{ color: tone.accent }}>
         הקישו לחשיפה
       </p>
-    </div>
+    </motion.div>
   );
 }
 
-function CardFront({ item, isTop }) {
+function CardFront({ item, isTop, visibility }) {
   if (item.kind === "power") {
     const Icon = iconFor(item.icon);
     return (
-      <div className={`${faceBase} flex flex-col items-center justify-center gap-6 bg-night px-8 text-center text-white`} style={{ transform: "rotateY(180deg)" }}>
+      <motion.div className={`${faceBase} flex flex-col items-center justify-center gap-6 bg-night px-8 text-center text-white`} style={{ rotateY: 180, visibility }}>
         <div className="pointer-events-none absolute inset-3 rounded-[22px] border border-gold-soft/30" />
         <div className="flex items-center gap-2 text-[13px] font-medium tracking-[0.12em] text-gold-soft">
           <Icon size={16} strokeWidth={1.8} />
@@ -112,12 +112,12 @@ function CardFront({ item, isTop }) {
         </div>
         <p className="font-display text-[26px] leading-snug">{item.text}</p>
         {item.type === "challenge" && isTop && <Timer seconds={item.seconds ?? 10} />}
-      </div>
+      </motion.div>
     );
   }
   const tone = toneOf(item.category.tone);
   return (
-    <div className={`${faceBase} grain flex flex-col bg-[#FFFDF9] p-7`} style={{ transform: "rotateY(180deg)" }}>
+    <motion.div className={`${faceBase} grain flex flex-col bg-[#FFFDF9] p-7`} style={{ rotateY: 180, visibility }}>
       <div className="flex items-center gap-2">
         <span className="size-2 rounded-full" style={{ background: tone.to }} />
         <span className="text-[13px] font-medium text-muted">{item.category.title}</span>
@@ -131,7 +131,7 @@ function CardFront({ item, isTop }) {
         <span className="text-[12px] tracking-[0.2em]">OPEN HEART</span>
         <LogoMark size={26} />
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -142,6 +142,15 @@ export default function Card({ item, depth, nav, onSwipe, progress }) {
   const ignoreTap = useRef(false);
   const leaving = useRef(false);
   const [lift, animateLift] = useAnimate();
+  // Flip angle as a motion value: each face is switched off once it turns past 90deg, so the
+  // back (and its heart) can never bleed through the question, whatever the browser does with backface-visibility.
+  const rotY = useMotionValue(0);
+  const backVisibility = useTransform(rotY, (v) => (v < 90 ? "visible" : "hidden"));
+  const frontVisibility = useTransform(rotY, (v) => (v >= 90 ? "visible" : "hidden"));
+  useEffect(() => {
+    const controls = animate(rotY, flipped ? 180 : 0, flipSpring);
+    return () => controls.stop();
+  }, [flipped, rotY]);
   const x = useMotionValue(0);
   const rotate = useTransform(x, [-260, 260], [-16, 16]);
   const glare = useTransform(x, [-200, 0, 200], [0.35, 0, 0.35]);
@@ -197,11 +206,10 @@ export default function Card({ item, depth, nav, onSwipe, progress }) {
           className={`preserve-3d relative size-full rounded-[var(--radius-card)] transition-shadow duration-300 ${
             isTop ? "shadow-[var(--shadow-card)]" : "shadow-[var(--shadow-soft)]"
           }`}
-          animate={{ rotateY: flipped ? 180 : 0 }}
-          transition={flipSpring}
+          style={{ rotateY: rotY }}
         >
-          <CardBack item={item} hidden={flipped} />
-          <CardFront item={item} isTop={isTop} />
+          <CardBack item={item} hidden={flipped} visibility={backVisibility} />
+          <CardFront item={item} isTop={isTop} visibility={frontVisibility} />
         </motion.div>
         {/* Light sweep while dragging */}
         <motion.div

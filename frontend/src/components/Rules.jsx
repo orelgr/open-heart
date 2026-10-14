@@ -5,7 +5,7 @@ import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { iconFor } from "../lib/icons.js";
 import { navigate } from "../lib/router.js";
 
-/** Shared rules body — used by the Rules page and the in-game sheet. */
+/** Shared rules body - used by the Rules page and the in-game sheet. */
 export function RulesContent({ content, dense = false }) {
   const { rules, powerCards } = content;
   const uniquePowers = [...new Map(powerCards.map((p) => [p.title, p])).values()];

@@ -1,4 +1,4 @@
-/** Open-heart mark: two arcs that almost meet — an open, unfinished heart. */
+/** Open-heart mark: two arcs that almost meet - an open, unfinished heart. */
 export function LogoMark({ size = 56, light = false }) {
   return (
     <svg width={size} height={size} viewBox="0 0 120 120" fill="none" aria-hidden>

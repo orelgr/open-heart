@@ -6,9 +6,9 @@ import { toneOf } from "../lib/icons.js";
 
 /**
  * Two-act shuffle, ~4.7 s (tap anywhere to skip):
- *   1. Riffle  – on a 3D table the deck splits in two, the inner corners lift and the cards cascade
+ *   1. Riffle - on a 3D table the deck splits in two, the inner corners lift and the cards cascade
  *                alternately into one stack, which is squared and then lifted up to face the viewer.
- *   2. Helix   – the stack blooms into a spinning helix around the logo, colours weave together,
+ *   2. Helix - the stack blooms into a spinning helix around the logo, colours weave together,
  *                then it spirals back into one stack with a golden pulse.
  * Dark power cards are mixed into both acts. Each act is one shared timeline (seconds).
  */

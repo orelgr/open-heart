@@ -1,4 +1,4 @@
-"""Open Heart (לבבות פתוחים) — FastAPI backend.
+"""Open Heart (לבבות פתוחים) - FastAPI backend.
 
 Serves game content from questions.json and, in production, the built
 frontend (frontend/dist) as a single-page app.

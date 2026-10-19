@@ -104,10 +104,10 @@ export function AuthPage({ mode, onAuth }) {
             </div>
           )}
           <Field
-            label="מייל"
-            type="email"
-            dir="ltr"
-            inputMode="email"
+            label={isRegister ? "מייל" : "מייל או שם של אחד מכם"}
+            type={isRegister ? "email" : "text"}
+            dir={isRegister ? "ltr" : "auto"}
+            inputMode={isRegister ? "email" : "text"}
             autoComplete={isRegister ? "email" : "username"}
             autoCapitalize="none"
             spellCheck={false}
@@ -241,7 +241,12 @@ export function AccountPage({ user, onUser }) {
           {msg && <p className="rounded-2xl bg-sage/20 px-4 py-3 text-[15px] text-[#3F5A3C]">{msg}</p>}
           <ErrorText>{error}</ErrorText>
 
-          <Button variant="glass" onClick={() => open("password")}>שינוי סיסמה</Button>
+          {user.admin && (
+            <p className="rounded-2xl bg-gold/12 px-4 py-3 text-[14px] leading-relaxed text-[#7F5F2A]">
+              חשבון המנהל מנוהל בשרת: הסיסמה נקבעת ב-ADMIN_PASSWORD_HASH ולא ניתן למחוק אותו מכאן.
+            </p>
+          )}
+          {!user.admin && <Button variant="glass" onClick={() => open("password")}>שינוי סיסמה</Button>}
           {panel === "password" && (
             <motion.form initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} onSubmit={changePassword} className="grid gap-3">
               <PasswordField label="סיסמה נוכחית" autoComplete="current-password" value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
@@ -265,10 +270,10 @@ export function AccountPage({ user, onUser }) {
             התנתקות
           </Button>
 
-          <Button variant="ghost" className="!text-[#8A4B37]" onClick={() => open("delete")}>
+          {!user.admin && <Button variant="ghost" className="!text-[#8A4B37]" onClick={() => open("delete")}>
             <Trash2 size={18} strokeWidth={1.8} />
             מחיקת החשבון
-          </Button>
+          </Button>}
           {panel === "delete" && (
             <motion.form initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} onSubmit={remove} className="grid gap-3">
               <p className="text-[14px] leading-relaxed text-muted">
@@ -292,7 +297,7 @@ export function AccountPage({ user, onUser }) {
 
 const PRIVACY = [
   ["מי אנחנו", "לבבות פתוחים הוא משחק קלפי שיחה. האחראי על המידע הוא מפעיל האתר, וניתן לפנות אליו בכל נושא פרטיות בכתובת: [להשלים כתובת מייל לפניות פרטיות]."],
-  ["איזה מידע נאסף", "כתובת מייל, השמות של שניכם, סיסמה, ורשימת הקלפים שסימנתם כנענו (רק מזהה הקלף ומועד הסימון). התשובות והשיחות עצמן אינן נשמרות ואינן נשלחות אלינו."],
+  ["איזה מידע נאסף", "כתובת מייל, השמות של שניכם, סיסמה, ורשימת הקלפים שסימנתם כנענו (רק מזהה הקלף ומועד הסימון). אם דיווחתם על קלף, נשמרים הקלף, סוג הבעיה וההערה שכתבתם, כדי שנוכל לתקן אותו (גם אחרי מחיקת החשבון, בלי קשר אליכם). התשובות והשיחות עצמן אינן נשמרות ואינן נשלחות אלינו."],
   ["למה", "כדי לזהות אתכם בהתחברות, לאבטח את החשבון, להציג את השמות שלכם במשחק ולהוציא מהחבילה קלפים שכבר עניתם. לא נשתמש במידע לפרסום, לא נמכור אותו ולא נעביר אותו לאחרים, אלא אם נידרש לכך על פי דין."],
   ["חובה למסור?", "אין חובה חוקית למסור את המידע. המשחק דורש חשבון, ולכן בלי מייל, שם וסיסמה לא ניתן לשחק. השם של בן/בת הזוג אינו חובה."],
   ["איך המידע מוגן", "התקשורת מוצפנת (HTTPS). המייל והשמות נשמרים מוצפנים (AES-256). הסיסמה אינה נשמרת כלל, אלא רק גיבוב חד-כיווני (Argon2id). הגישה לשרת מוגבלת, ונרשם יומן אבטחה של התחברויות (כולל כתובת IP) שנמחק אוטומטית אחרי שנה."],

@@ -55,6 +55,7 @@ def _subkey(master: bytes, label: bytes) -> bytes:
 _MASTER = _master_key()
 _AES = AESGCM(_subkey(_MASTER, b"field-encryption/v1"))
 _LOOKUP_KEY = _subkey(_MASTER, b"email-lookup/v1")
+_NAME_KEY = _subkey(_MASTER, b"name-lookup/v1")
 del _MASTER
 
 
@@ -76,6 +77,12 @@ def normalize_email(email: str) -> str:
 
 def email_lookup(email: str) -> bytes:
     return hmac.new(_LOOKUP_KEY, normalize_email(email).encode(), hashlib.sha256).digest()
+
+
+def name_lookup(name: str) -> bytes | None:
+    """Case/space-insensitive HMAC of a player name; None for an empty name (never matches)."""
+    norm = " ".join(unicodedata.normalize("NFKC", name).split()).casefold()
+    return hmac.new(_NAME_KEY, norm.encode(), hashlib.sha256).digest() if norm else None
 
 
 # ---------- passwords ----------

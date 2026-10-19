@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { BookOpen, CircleCheck, CircleUserRound } from "lucide-react";
+import { BookOpen, CircleCheck, CircleUserRound, LayoutDashboard } from "lucide-react";
 import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { LogoMark } from "./Logo.jsx";
 import { toneOf } from "../lib/icons.js";
@@ -11,13 +11,20 @@ const fan = [
   { rotate: 0, x: 0, y: 0, tone: null },
 ];
 
-export default function Home({ content, players, setPlayers, answeredCount }) {
-  const total = content?.categories.reduce((n, c) => n + c.questions.length, 0) ?? 0;
+export default function Home({ content, players, setPlayers, answeredCount, isAdmin }) {
+  const total = content ? [...content.categories, ...(content.games ?? [])].reduce((n, c) => n + (c.questions?.length ?? 0), 0) : 0;
 
   return (
     <Screen className="items-center justify-between text-center">
       <div className="w-full">
         <TopBar
+          right={
+            isAdmin && (
+              <IconButton label="ניהול" onClick={() => navigate("/admin")} data-testid="open-admin">
+                <LayoutDashboard size={20} strokeWidth={1.7} />
+              </IconButton>
+            )
+          }
           left={
             <IconButton label="החשבון שלי" onClick={() => navigate("/account")} data-testid="account">
               <CircleUserRound size={21} strokeWidth={1.7} />
@@ -70,7 +77,7 @@ export default function Home({ content, players, setPlayers, answeredCount }) {
         </p>
         {content && (
           <p className="mt-4 text-[13px] text-muted/80" data-testid="home-stats">
-            {total} שאלות · {content.categories.length} עולמות · קלפי כוח
+            {total} שאלות · {content.games?.length ?? 1} משחקונים · קלפי כוח
           </p>
         )}
       </div>

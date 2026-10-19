@@ -22,7 +22,7 @@ export const auth = {
   me: () => call("/session").then((d) => d?.user ?? null), // never undefined, or the app waits forever
   register: (email, name, partner, password, consent) =>
     call("/register", { method: "POST", body: { email, name, partner, password, consent } }),
-  login: (email, password) => call("/login", { method: "POST", body: { email, password } }),
+  login: (login, password) => call("/login", { method: "POST", body: { login, password } }), // email or either name
   logout: () => call("/logout", { method: "POST" }),
   updateName: (name, partner) => call("/me", { method: "PATCH", body: { name, partner } }),
   changePassword: (current, next) => call("/password", { method: "POST", body: { current, new: next } }),

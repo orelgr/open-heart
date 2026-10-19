@@ -12,7 +12,7 @@ import uuid
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 import security as sec
 from db import get_db, transaction
@@ -28,6 +28,12 @@ PASSWORD_MIN = int(os.getenv("PASSWORD_MIN_LENGTH", "12"))
 PASSWORD_MAX = 128
 AUDIT_RETENTION_DAYS = int(os.getenv("AUDIT_RETENTION_DAYS", "365"))
 LOCK_AFTER = 5  # failed logins before per-account backoff kicks in
+NAME_CANDIDATES = 10  # accounts checked when signing in by a (shared) first name
+NAME_FAIL_LIMIT = 5  # wrong passwords via name in 24 h before that account needs its email to sign in
+# The admin signs in with this username (not a player name). Its password lives only in the server's
+# environment (ADMIN_PASSWORD_HASH in backend/.env), see admin.ensure_admin.
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
+ADMIN_MANAGED = "סיסמת המנהל מנוהלת בשרת (ADMIN_PASSWORD_HASH)"
 
 ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip() not in ("", "*")}
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
@@ -38,7 +44,8 @@ COMMON = {
     "openheart123", "openhearts12", "levavotptuhim",
 }
 
-GENERIC_LOGIN_ERROR = "המייל או הסיסמה שגויים"
+GENERIC_LOGIN_ERROR = "הפרטים או הסיסמה שגויים"
+NAME_LOGIN_ERROR = "השם או הסיסמה שגויים. אם השם נפוץ, נסו להתחבר עם המייל"
 TOO_MANY = "יותר מדי ניסיונות. נסו שוב בעוד כמה דקות."
 
 
@@ -52,7 +59,7 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    email: str = Field(max_length=254)
+    login: str = Field(max_length=254, validation_alias=AliasChoices("login", "email"))  # email or either name
     password: str = Field(max_length=PASSWORD_MAX * 4)
 
 
@@ -119,7 +126,15 @@ def clean_name(name: str, required: bool = True) -> str:
     name = " ".join(name.split())
     if not (1 if required else 0) <= len(name) <= 40 or CONTROL_RE.search(name):
         raise HTTPException(422, "שם צריך להכיל 1 עד 40 תווים")
+    if "@" in name:  # "@" tells a sign-in by email from a sign-in by name
+        raise HTTPException(422, "שם לא יכול להכיל @")
+    if is_admin_login(name):  # "admin" always means the admin account at sign-in
+        raise HTTPException(422, "השם הזה שמור, בחרו שם אחר")
     return name
+
+
+def is_admin_login(login: str) -> bool:
+    return bool(ADMIN_USERNAME) and " ".join(login.split()).casefold() == ADMIN_USERNAME.casefold()
 
 
 def check_email(email: str) -> str:
@@ -151,6 +166,7 @@ def user_out(row: sqlite3.Row) -> dict:
         "name": sec.decrypt(row["name_enc"], "name:" + aad),
         "partner": sec.decrypt(row["partner_enc"], "partner:" + aad) if row["partner_enc"] else "",
         "createdAt": row["created_at"],
+        "admin": bool(row["is_admin"]),
     }
 
 
@@ -214,14 +230,15 @@ def register(body: RegisterIn, request: Request, response: Response, conn: sqlit
     try:
         with transaction(conn):
             cur = conn.execute(
-                "INSERT INTO users (public_id, email_lookup, email_enc, name_enc, partner_enc, password_hash, "
-                "consent_version, consent_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO users (public_id, email_lookup, email_enc, name_enc, partner_enc, name_lookup, partner_lookup, "
+                "password_hash, consent_version, consent_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     public_id,
                     sec.email_lookup(email),
                     sec.encrypt(email, "email:" + public_id),
                     sec.encrypt(name, "name:" + public_id),
                     sec.encrypt(partner, "partner:" + public_id),
+                    *name_lookups(name, partner),
                     password_hash,
                     PRIVACY_VERSION,
                     t,
@@ -236,11 +253,63 @@ def register(body: RegisterIn, request: Request, response: Response, conn: sqlit
     return {"id": public_id, "email": email, "name": name, "partner": partner, "createdAt": t}
 
 
+def login_by_name(conn: sqlite3.Connection, name: str, password: str, request: Request) -> sqlite3.Row:
+    """Either partner's name + password. Names are not unique, so every account with that name is checked
+    and exactly one must accept the password (two strangers sharing name + password -> use the email).
+    Anti-guessing without letting anyone lock out a whole common name:
+    - per name: 10 tries / 15 min and 30 / day (+ the per-IP limit);
+    - per account: every wrong password via name is counted, and after NAME_FAIL_LIMIT in 24 h that
+      account is skipped by name sign-in (its email sign-in, with its own lockout, keeps working)."""
+    lookup = sec.name_lookup(name)
+    if lookup:
+        bucket = f"login-name:{lookup.hex()[:32]}"
+        throttle(conn, bucket, limit=10, window=900)
+        throttle(conn, bucket + ":day", limit=30, window=86400)
+    t = now()
+    rows = conn.execute(
+        "SELECT * FROM users u WHERE (name_lookup = ? OR partner_lookup = ?) AND locked_until <= ? "
+        "AND (SELECT COUNT(*) FROM rate_events WHERE bucket = 'name-fail:' || u.id AND created_at > ?) < ? "
+        "ORDER BY last_login_at DESC LIMIT ?",
+        (lookup, lookup, t, t - 86400, NAME_FAIL_LIMIT, NAME_CANDIDATES),
+    ).fetchall() if lookup else []
+    if not rows:
+        sec.verify_password(sec.DUMMY_HASH, password)
+    matches = [r for r in rows if sec.verify_password(r["password_hash"], password)]
+    if len(matches) != 1:
+        for r in rows:
+            if r not in matches:
+                conn.execute("INSERT INTO rate_events (bucket, created_at) VALUES (?, ?)", (f"name-fail:{r['id']}", t))
+                audit(conn, "login_failed_name", r["id"], request)
+        if not rows:
+            audit(conn, "login_failed", None, request)
+        raise HTTPException(401, NAME_LOGIN_ERROR)
+    return matches[0]
+
+
+def name_lookups(name: str, partner: str) -> tuple[bytes | None, bytes | None]:
+    return sec.name_lookup(name), sec.name_lookup(partner)
+
+
+def backfill_name_lookups(conn: sqlite3.Connection) -> None:
+    """Schema v3 migration: accounts created before name sign-in get their lookups once."""
+    for r in conn.execute("SELECT * FROM users WHERE name_lookup IS NULL").fetchall():
+        info = user_out(r)
+        conn.execute(
+            "UPDATE users SET name_lookup = ?, partner_lookup = ? WHERE id = ?", (*name_lookups(info["name"], info["partner"]), r["id"])
+        )
+
+
 @router.post("/login", dependencies=[Depends(require_same_origin)])
 def login(body: LoginIn, request: Request, response: Response, conn: sqlite3.Connection = Depends(get_db)):
     throttle(conn, f"login:{client_ip(request)}", limit=30, window=900)
     purge_expired(conn)
-    user = conn.execute("SELECT * FROM users WHERE email_lookup = ?", (sec.email_lookup(body.email),)).fetchone()
+    if is_admin_login(body.login):
+        user = conn.execute("SELECT * FROM users WHERE is_admin = 1 ORDER BY id LIMIT 1").fetchone()
+    elif "@" not in body.login:
+        user = login_by_name(conn, body.login, body.password, request)
+        return finish_login(conn, user, body.password, request, response)
+    else:
+        user = conn.execute("SELECT * FROM users WHERE email_lookup = ?", (sec.email_lookup(body.login),)).fetchone()
     if not user:
         sec.verify_password(sec.DUMMY_HASH, body.password)  # same cost as a real check
         audit(conn, "login_failed", None, request)
@@ -255,9 +324,12 @@ def login(body: LoginIn, request: Request, response: Response, conn: sqlite3.Con
         conn.execute("UPDATE users SET failed_logins = ?, locked_until = ? WHERE id = ?", (fails, locked, user["id"]))
         audit(conn, "login_failed", user["id"], request)
         raise HTTPException(401, GENERIC_LOGIN_ERROR)
+    return finish_login(conn, user, body.password, request, response)
 
+
+def finish_login(conn: sqlite3.Connection, user: sqlite3.Row, password: str, request: Request, response: Response) -> dict:
     with transaction(conn):
-        new_hash = sec.hash_password(body.password) if sec.needs_rehash(user["password_hash"]) else user["password_hash"]
+        new_hash = sec.hash_password(password) if sec.needs_rehash(user["password_hash"]) else user["password_hash"]
         conn.execute(
             "UPDATE users SET failed_logins = 0, locked_until = 0, last_login_at = ?, password_hash = ? WHERE id = ?",
             (now(), new_hash, user["id"]),
@@ -296,8 +368,14 @@ def update_profile(body: ProfileIn, session: sqlite3.Row = Depends(current_sessi
     if body.partner is not None:
         out["partner"] = clean_name(body.partner, required=False)
     conn.execute(
-        "UPDATE users SET name_enc = ?, partner_enc = ?, updated_at = ? WHERE id = ?",
-        (sec.encrypt(out["name"], "name:" + pid), sec.encrypt(out["partner"], "partner:" + pid), now(), session["id"]),
+        "UPDATE users SET name_enc = ?, partner_enc = ?, name_lookup = ?, partner_lookup = ?, updated_at = ? WHERE id = ?",
+        (
+            sec.encrypt(out["name"], "name:" + pid),
+            sec.encrypt(out["partner"], "partner:" + pid),
+            *((None, None) if session["is_admin"] else name_lookups(out["name"], out["partner"])),  # admin signs in as ADMIN_USERNAME
+            now(),
+            session["id"],
+        ),
     )
     return out
 
@@ -310,6 +388,8 @@ def change_password(
     session: sqlite3.Row = Depends(current_session),
     conn: sqlite3.Connection = Depends(get_db),
 ):
+    if session["is_admin"]:
+        raise HTTPException(403, ADMIN_MANAGED)
     throttle(conn, f"password:{session['public_id']}", limit=10, window=3600)
     if not sec.verify_password(session["password_hash"], body.current):
         raise HTTPException(403, "הסיסמה הנוכחית שגויה")
@@ -332,6 +412,9 @@ def export_data(session: sqlite3.Row = Depends(current_session), conn: sqlite3.C
     answered = conn.execute(
         "SELECT card_key, answered_at FROM answered_cards WHERE user_id = ? ORDER BY answered_at", (session["id"],)
     ).fetchall()
+    reports = conn.execute(
+        "SELECT card_key, reason, note, status, created_at FROM card_reports WHERE user_id = ? ORDER BY created_at", (session["id"],)
+    ).fetchall()
     events = conn.execute(
         "SELECT event, ip, created_at FROM auth_events WHERE user_id = ? ORDER BY created_at", (session["id"],)
     ).fetchall()
@@ -343,6 +426,7 @@ def export_data(session: sqlite3.Row = Depends(current_session), conn: sqlite3.C
             "privacyConsent": {"version": session["consent_version"], "at": session["consent_at"]},
         },
         "answeredCards": [dict(r) for r in answered],
+        "cardReports": [dict(r) for r in reports],
         "sessions": [dict(r) for r in sessions],
         "securityLog": [dict(r) for r in events],
         "note": "הסיסמה שמורה רק כגיבוב חד-כיווני (Argon2id) ולכן אינה ניתנת לשחזור או לייצוא.",
@@ -357,6 +441,8 @@ def delete_account(
     session: sqlite3.Row = Depends(current_session),
     conn: sqlite3.Connection = Depends(get_db),
 ):
+    if session["is_admin"]:
+        raise HTTPException(403, ADMIN_MANAGED)
     throttle(conn, f"delete:{session['public_id']}", limit=10, window=3600)
     if not sec.verify_password(session["password_hash"], body.password):
         raise HTTPException(403, "הסיסמה שגויה")

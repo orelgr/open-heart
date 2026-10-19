@@ -9,26 +9,51 @@ const shuffle = (arr) => {
 
 const randInt = (min, max) => min + Math.floor(Math.random() * (max - min + 1));
 
+/** Which power cards a mini-game deals ("power" field of a game in questions.json). */
+const POWER_FILTERS = {
+  all: () => true,
+  none: () => false,
+  guess: (p) => p.type === "guess",
+  challenge: (p) => p.type === "challenge",
+  both: (p) => p.turn === "both" && !p.nextTurn,
+};
+
+/** Fallback when content has no "games" (old cached JSON): the classic mixed game. */
+export const CLASSIC = { id: "classic", power: "all" };
+export const gameOf = (content, id) => content.games?.find((g) => g.id === id) ?? content.games?.[0] ?? CLASSIC;
+
 /**
- * Build a play deck: questions from all selected categories are shuffled together,
- * and a power card is dealt every minGap..maxGap questions (never two in a row).
+ * Build a play deck for a mini-game. Questions come from every category, shuffled together, unless
+ * the game has its own `questions` ("זה או זה": pairs [a, b], the game itself stands in for the category).
+ * - `limit` caps the number of questions; `power` picks which power cards are dealt (POWER_FILTERS),
+ *   one every minGap..maxGap questions (never two in a row, never as the last card).
+ * - `turn` "both": everyone answers every question; "guess": every question is a "מה יענה?" guess.
+ * - `seconds`: each question gets its own countdown (card.seconds).
  * Cards the couple already checked off (`answered`: Set of answerKey) are left out.
- * answerKey: "<categoryId>-<index>" for questions, "pc-<id>" for "מה יענה?" cards, null otherwise.
+ * answerKey: "<categoryId>-<index>" (or "<gameId>-<index>") for questions, "pc-<id>" for "מה יענה?" cards, null otherwise.
  */
-export function buildDeck(content, categoryIds, answered = new Set()) {
+export function buildDeck(content, game = CLASSIC, answered = new Set()) {
   const { categories, meta } = content;
   const powerCards = content.powerCards
+    .filter(POWER_FILTERS[game.power ?? "all"] ?? POWER_FILTERS.all)
     .map((p) => ({ ...p, answerKey: p.type === "guess" ? `pc-${p.id}` : null }))
     .filter((p) => !answered.has(p.answerKey));
   const minGap = meta?.powerCardMinGap ?? 3;
   const maxGap = Math.max(minGap, meta?.powerCardMaxGap ?? 5);
 
-  const questions = shuffle(
-    categories
-      .filter((c) => categoryIds.includes(c.id))
-      .flatMap((c) => c.questions.map((text, i) => ({ kind: "question", key: `${c.id}-${i}`, answerKey: `${c.id}-${i}`, text, category: c })))
-      .filter((q) => !answered.has(q.answerKey))
+  const questionsOf = (c) =>
+    c.questions
+      .map((text, i) => ({ kind: "question", key: `${c.id}-${i}`, answerKey: `${c.id}-${i}`, text, category: c, seconds: game.seconds }))
+      .filter((q) => !answered.has(q.answerKey));
+  let questions = shuffle(
+    game.questions
+      ? questionsOf({ ...game, questions: game.questions.map(([a, b]) => `${a} או ${b}?`) }).map((q) => ({
+          ...q,
+          options: game.questions[q.key.slice(game.id.length + 1)],
+        }))
+      : categories.flatMap(questionsOf)
   );
+  if (game.limit) questions = questions.slice(0, game.limit);
 
   let powers = shuffle(powerCards);
   const deck = [];
@@ -52,14 +77,14 @@ export function buildDeck(content, categoryIds, answered = new Set()) {
   let nextBoth = false;
   let nextGuess = false;
   for (const card of deck) {
-    const both = card.kind === "question" ? nextBoth : card.turn === "both";
+    const both = card.kind === "question" ? nextBoth || game.turn === "both" : card.turn === "both";
     if (both) card.player = "both";
     else {
       card.player = player;
       player = 1 - player;
     }
     if (card.kind === "question") {
-      if (nextGuess && !both) card.guess = true;
+      if ((nextGuess || game.turn === "guess") && !both) card.guess = true;
       nextBoth = nextGuess = false;
     } else if (card.nextTurn === "both") nextBoth = true;
     else if (card.nextTurn === "guess") nextGuess = true;

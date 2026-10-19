@@ -17,7 +17,7 @@ export default function AnsweredPage({ content, answered, setCardAnswered, onRes
   const all = answerableCards(content);
   const items = [...seen.current].filter((k) => all.has(k));
   const groups = [
-    ...content.categories.map((c) => ({ id: c.id, title: c.title, tone: c.tone, keys: items.filter((k) => all.get(k).category?.id === c.id) })),
+    ...[...content.categories, ...(content.games ?? []).filter((g) => g.questions)].map((c) => ({ id: c.id, title: c.title, tone: c.tone, keys: items.filter((k) => all.get(k).category?.id === c.id) })),
     { id: "guess", title: "מה יענה?", tone: null, keys: items.filter((k) => all.get(k).kind === "power") },
   ].filter((g) => g.keys.length);
 

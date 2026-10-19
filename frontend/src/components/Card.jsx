@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { animate, motion, useAnimate, useMotionValue, useMotionValueEvent, useTransform } from "framer-motion";
-import { Check, Lightbulb, Zap } from "lucide-react";
+import { Check, Lightbulb, Target, Zap } from "lucide-react";
 import { LogoMark } from "./Logo.jsx";
 import Timer from "./Timer.jsx";
 import { iconFor, toneOf } from "../lib/icons.js";
@@ -85,6 +85,30 @@ function CheckButton({ checked, onCheck, dark = false, className = "" }) {
   );
 }
 
+/** "מה יענה?" game: the guesser got it right -> one point (tap again to take it back). */
+function HitButton({ hit, onHit, dark = false }) {
+  const idle = dark ? "border-gold-soft/40 text-gold-soft" : "border-gold/40 bg-white/70 text-[#7F5F2A]";
+  const on = dark ? "border-gold-soft bg-gold-soft text-night" : "border-gold bg-gold text-white";
+  return (
+    <motion.button
+      type="button"
+      data-no-flip
+      data-testid="card-hit"
+      aria-pressed={hit}
+      whileTap={{ scale: 0.92 }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onHit();
+      }}
+      className={`flex h-10 w-fit items-center gap-2 self-center rounded-full border px-4 text-[14px] font-medium transition-colors duration-200 ${hit ? on : idle}`}
+    >
+      <Target size={16} strokeWidth={2} />
+      {hit ? "ניחוש נכון · נקודה!" : "הניחוש היה נכון?"}
+    </motion.button>
+  );
+}
+
 const faceBase = "absolute inset-0 overflow-hidden rounded-[var(--radius-card)] backface-hidden";
 
 /** Card back (face-down side). */
@@ -138,8 +162,9 @@ export function CardBack({ item, turn, hidden = false, visibility }) {
   );
 }
 
-function CardFront({ item, turn, isTop, visibility, checked, onCheck }) {
+function CardFront({ item, turn, isTop, flipped, visibility, checked, onCheck, hit, onHit }) {
   const checkable = isTop && !!item.answerKey && !!onCheck;
+  const scorable = isTop && !!onHit && isGuess(item);
   if (item.kind === "power") {
     const Icon = iconFor(item.icon);
     return (
@@ -151,6 +176,7 @@ function CardFront({ item, turn, isTop, visibility, checked, onCheck }) {
         </div>
         <p className="font-display text-[26px] leading-snug">{item.text}</p>
         {item.type === "challenge" && isTop && <Timer seconds={item.seconds ?? 10} />}
+        {scorable && <HitButton dark hit={hit} onHit={onHit} />}
         {(turn || item.type === "guess") && (
           <p className="absolute inset-x-0 bottom-9 text-[14px] font-medium text-gold-soft/90" data-testid={item.type === "guess" ? "guess-hint" : undefined}>
             {turn ?? GUESS_HINT}
@@ -174,9 +200,30 @@ function CardFront({ item, turn, isTop, visibility, checked, onCheck }) {
             {`מה יענה? ${GUESS_HINT}`}
           </span>
         )}
-        <p className="font-display text-[28px] leading-[1.35] text-ink" data-testid="question-text">
-          {item.text}
-        </p>
+        {item.options ? (
+          // "זה או זה": two options with an "או" divider.
+          <div className="flex flex-col gap-3 text-center" data-testid="question-text">
+            <p className="text-[14px] font-medium tracking-wide text-muted">מה הייתם מעדיפים?</p>
+            <p className="font-display text-[25px] leading-[1.3] text-ink">{item.options[0]}</p>
+            <div className="flex items-center gap-3 text-[14px] font-semibold" style={{ color: tone.accent }}>
+              <span className="h-px flex-1" style={{ background: tone.to }} />
+              או
+              <span className="h-px flex-1" style={{ background: tone.to }} />
+            </div>
+            <p className="font-display text-[25px] leading-[1.3] text-ink">{item.options[1]}</p>
+          </div>
+        ) : (
+          <p className="font-display text-[28px] leading-[1.35] text-ink" data-testid="question-text">
+            {item.text}
+          </p>
+        )}
+        {/* Speed round: the clock starts the moment the question is revealed. */}
+        {item.seconds && isTop && flipped && (
+          <div className="mt-1 self-center">
+            <Timer seconds={item.seconds} light autoStart />
+          </div>
+        )}
+        {scorable && <HitButton hit={hit} onHit={onHit} />}
       </div>
       <div className="flex items-center justify-between text-muted/70">
         {turn ? (
@@ -194,7 +241,7 @@ function CardFront({ item, turn, isTop, visibility, checked, onCheck }) {
 }
 
 /** One card in the stack. Only the top card (depth 0) can be dragged and flipped. */
-export default function Card({ item, players, depth, nav, onSwipe, progress, checked = false, onCheck }) {
+export default function Card({ item, players, depth, nav, onSwipe, progress, checked = false, onCheck, hit = false, onHit }) {
   const isTop = depth === 0;
   const turn = turnLabel(item, players);
   const [flipped, setFlipped] = useState(false);
@@ -268,7 +315,17 @@ export default function Card({ item, players, depth, nav, onSwipe, progress, che
           style={{ rotateY: rotY }}
         >
           <CardBack item={item} turn={turn} hidden={flipped} visibility={backVisibility} />
-          <CardFront item={item} turn={turn} isTop={isTop} visibility={frontVisibility} checked={checked} onCheck={onCheck && (() => onCheck(item))} />
+          <CardFront
+            item={item}
+            turn={turn}
+            isTop={isTop}
+            flipped={flipped}
+            visibility={frontVisibility}
+            checked={checked}
+            onCheck={onCheck && (() => onCheck(item))}
+            hit={hit}
+            onHit={onHit && (() => onHit(item))}
+          />
         </motion.div>
         {/* Light sweep while dragging */}
         <motion.div

@@ -14,9 +14,11 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 
 - **One request** (`/api/content`) returns categories + questions + power cards + rules. The client caches it in
   `localStorage` (stale-while-revalidate, `src/lib/api.js`), so every screen after first load renders instantly.
-- Routing is a 20-line hash router (`src/lib/router.js`): `#/`, `#/rules`, `#/select`, `#/play`. Browser back works.
-- Deck building (`src/lib/deck.js`): questions from all selected categories are shuffled **together** (mixed),
-  and a power card is dealt every `meta.powerCardMinGap`..`powerCardMaxGap` questions (3..5, never consecutive,
+- Routing is a 20-line hash router (`src/lib/router.js`): `#/`, `#/rules`, `#/select` (mini-game picker), `#/play`,
+  `#/admin` `#/admin/reports` `#/admin/cards[/<key>]` `#/admin/users` (admin only). Browser back works.
+- **Mini-games** (`games` in questions.json, picked on `#/select`, `GameSelect.jsx`): there is no category choice;
+  every game draws from all categories. `buildDeck(content, game, answered)` (`src/lib/deck.js`) applies the game.
+- Deck building: questions are shuffled **together** (mixed), and a power card is dealt every `meta.powerCardMinGap`..`powerCardMaxGap` questions (3..5, never consecutive,
   none as the last card). Power cards are drawn without repetition until all 15 were used.
 - PWA: `public/manifest.webmanifest`, `public/sw.js` (navigations + API network-first, static assets cache-first),
   registered only in production builds.
@@ -32,11 +34,33 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 | `POST /api/auth/register` `login` `logout` `password` | account flows (JSON body, Origin-checked, rate-limited) |
 | `GET/PATCH/DELETE /api/auth/me`, `GET /api/auth/export` | profile, rename couple `{name,partner}`, delete (needs password), data export |
 | `GET /api/cards/answered`, `PUT`/`DELETE /api/cards/answered/{key}`, `DELETE /api/cards/answered` | checked-off cards: list, mark, unmark, reset all |
+| `POST /api/cards/reports` | report a card `{key, game, reason: unclear|typo|inappropriate|duplicate|other, note}` (20/h) |
+| `GET /api/admin/overview` `reports?status=open|resolved|all` `users`, `PATCH /api/admin/reports {ids,status}`, `POST /api/admin/reports/delete {ids}` | admin panel (is_admin session, else 403) |
+| `GET /api/admin/content`, `PUT`/`DELETE /api/admin/cards/{key}`, `POST /api/admin/cards {group,…}` | card editor; each returns `{content, edited, repoNewer}` |
 | `GET /*` | built SPA (only if `frontend/dist` exists; path-traversal guarded) |
 
 Env vars: `HOST` (0.0.0.0), `PORT` (8000), `RELOAD` (1 = auto-reload), `CORS_ORIGINS` (comma list, default `*`),
 `SECRET_KEY` (base64 ≥32 bytes; else `data/secret.key` is generated), `DATA_DIR` (`backend/data`), `COOKIE_SECURE`
-(1; set 0 only for plain-http LAN testing), `PASSWORD_MIN_LENGTH` (12), `HIBP_CHECK` (1), `AUDIT_RETENTION_DAYS` (365).
+(1; set 0 only for plain-http LAN testing), `PASSWORD_MIN_LENGTH` (12), `HIBP_CHECK` (1), `AUDIT_RETENTION_DAYS` (365),
+`ADMIN_PASSWORD_HASH` (Argon2id, from `python backend/admin_hash.py`), `ADMIN_USERNAME` (admin), `ADMIN_EMAIL` (admin@openhearts.local).
+`App.py` loads **`backend/.env`** (gitignored) before anything else; real env vars win.
+
+### Admin panel (`admin.py`, `Admin.jsx`)
+The admin is a normal account with `users.is_admin=1`, created/synced on every start by `ensure_admin` from
+`ADMIN_PASSWORD_HASH` (the env is the source of truth: new hash -> new password + all admin sessions dropped; UI
+password change/delete are blocked for it). Sign in with `ADMIN_USERNAME` ("admin"), intercepted before name sign-in;
+"admin" is a reserved player name. Home shows a dashboard button for admins. Tabs: סקירה (KPIs, most reported/answered)
+· דיווחים (grouped per card, open/resolved/all, search, resolve with undo toast, delete with inline confirm) · קלפים
+(card editor) · משתמשים (couples, masked emails).
+**Card editor** (`AdminCards.jsx`, shared bits in `adminUi.jsx`): all categories, games with own questions ("זה או זה",
+pairs) and power cards; edit text (power: title + text), delete (inline confirm), append new cards. A report's "לקלף"
+button opens `#/admin/cards/<key>`: the card is highlighted with its editor open and its open reports + "resolve".
+**Edited content lives in `backend/data/questions.json`** (outside git, so `git pull` never conflicts); once it exists it
+is served instead of `backend/questions.json` (startup warning + panel banner if the repo file is newer; "JSON" button
+downloads the live copy to commit). Each write is atomic with the previous version kept in `data/content-backups/` (50).
+Deleting shifts the positional keys after it in `answered_cards`/`card_reports` in the same transaction; reports on the
+deleted card become `removed:<key>:<time>` (resolved, text snapshot kept). **Card reports**: flag button at the right of the hint row under the deck (`ReportSheet` in
+`Report.jsx`); key = answerKey, or `pc-<id>` for any power card; the server snapshots the card text.
 
 ### Accounts (required: every route except #/login #/register #/privacy shows login). Compliance: `SECURITY.md`
 SQLite (`db.py`, WAL, `STRICT`, `secure_delete`), connection per request. Email + name AES-256-GCM encrypted
@@ -44,6 +68,10 @@ SQLite (`db.py`, WAL, `STRICT`, `secure_delete`), connection per request. Email 
 `__Host-session` cookie, only its SHA-256 stored. Never cache `/api/auth` (SW skips it, `no-store`).
 Privacy notice text = `PRIVACY` in `Account.jsx`; bump `PRIVACY_VERSION` in `auth.py` when it changes.
 One account per couple: `name` + `partner` (encrypted) are the two player names, edited on Home (debounced PATCH).
+Sign in with the email **or either name** (`POST /login {login,password}`; no "@" = name). Names aren't unique:
+HMAC `name_lookup`/`partner_lookup` finds up to 10 accounts and exactly one must accept the password, else
+"use the email". Name sign-ins don't lock accounts; throttled per name (10/15 min, 30/day) + per IP, and an
+account with 5 wrong passwords via name in 24 h is skipped by name sign-in (email still works). Names can't contain "@".
 **Answered cards**: ✓ button on a flipped question / "מה יענה?" card (`CheckButton` in `Card.jsx`) marks it and
 advances; `buildDeck(content, ids, answered)` leaves marked cards out; `#/answered` lists them and unchecking returns a
 card to the deck. Key (`answerKey`) = `<categoryId>-<index>` or `pc-<powerCardId>`, so **append** new questions at
@@ -51,19 +79,25 @@ the end of a category (reordering would shift keys).
 
 ### questions.json schema
 `meta{powerCardMinGap,powerCardMaxGap}` · `categories[{id,order,title,subtitle,icon,tone,questions[]}]` (6 × 15)
+· `games[{id,title,subtitle,icon,tone,power:"all"|"none"|"guess"|"challenge"|"both",limit?,turn?:"both"|"guess",seconds?,score?,questions?:[[a,b]]}]`
+  (classic · rather "זה או זה" = own 90 `[a,b]` pairs instead of categories, card shows "מה הייתם מעדיפים?" a / או / b,
+  key `rather-<index>` (also accepted by `backend/cards.py`), game object acts as the category · guess = every question a guess, "ניחוש נכון" button scores
+  for the guesser · rapid = `seconds` countdown auto-starts when a question is flipped · mirror = both answer everything)
 · `powerCards[{id,type:"challenge"|"power",turn:"single"|"both",nextTurn?:"both",title,icon,text,seconds?}]` · `rules{intro,steps[{icon,title,text}],etiquette[],powerIntro}`.
 `icon` = lucide-react name, mapped in `src/lib/icons.js` (add new names there). `tone` ∈ sand|gold|sage|sky|clay|plum.
-To add content, edit only the JSON — no frontend change needed.
+To add content, edit only the JSON — no frontend change needed (if the admin already edited cards, the served file is
+`backend/data/questions.json`: edit/merge there).
 
 ## Folder structure
 ```
-backend/   App.py · auth.py · cards.py · db.py · security.py · backup_db.py · questions.json · requirements.txt · data/ (gitignored)
+backend/   App.py · auth.py · cards.py · admin.py · admin_hash.py · db.py · security.py · backup_db.py · questions.json · requirements.txt
+           · data/ (gitignored: DB, key, admin-edited questions.json + content-backups/) · .env (gitignored)
 frontend/  index.html · vite.config.js (proxy /api → :8000) · public/{icon.svg,manifest.webmanifest,sw.js}
   src/  main.jsx · App.jsx (content load, routing, screen transitions) · index.css (Tailwind v4 @theme tokens)
     lib/        api.js · auth.js · cards.js · router.js · deck.js · icons.js (icon map + category tones)
     components/ ui.jsx (Button, IconButton, Screen, TopBar, Backdrop) · Logo.jsx · Home.jsx · Account.jsx · Answered.jsx (#/answered)
                 (AuthPage #/login #/register, AccountPage #/account, PrivacyPage #/privacy) · Rules.jsx
-                (RulesPage, RulesContent, RulesSheet) · CategorySelect.jsx · Game.jsx · Card.jsx · Timer.jsx
+                (RulesPage, RulesContent, RulesSheet) · GameSelect.jsx · Game.jsx · Card.jsx · Timer.jsx · Report.jsx · Admin.jsx (#/admin) · AdminCards.jsx · adminUi.jsx
 ecosystem.config.js   PM2 process file
 ```
 
@@ -133,13 +167,17 @@ Point the reverse proxy (nginx/Caddy) for `openhearts.gmarup.com` to `127.0.0.1:
 service worker / installable PWA). Windows servers: set `PYTHON=python` (ecosystem uses `python3` by default).
 
 ## Testing (Playwright MCP, iPhone viewport 390×844)
-Verified: home loads stats from Python API (90 questions/6 categories) · Home→Rules 45 ms · category multi-select
+Verified: home loads stats from Python API (90 questions/6 categories) · Home→Rules 45 ms · mini-game select
 & count · card tap-flip · drag swipe advances · "next" button · power card appears within gap · 10 s timer counts
 down without flipping the card · rules FAB opens/closes sheet · no horizontal/body scroll · 0 console errors ·
 prod build served by FastAPI (`/`, `/sw.js`, `/api/content` → 200).
-Stable test hooks: `data-testid` = start, open-rules, home-stats, cat-<id>, play, card (`data-kind`, `data-flipped`),
+Stable test hooks: `data-testid` = start, open-rules, home-stats, game-<id>, play, card (`data-kind`, `data-flipped`),
 next, progress, rules-fab, rules-sheet, rules-close, timer-value, deck-done, account, auth-{name,partner,email,password,consent,submit}, card-check, open-answered, answered-count,
-answered-list, answered-toggle, reset-confirm, account-name, logout, delete-confirm.
+answered-list, answered-toggle, reset-confirm, account-name, logout, delete-confirm, card-hit, score, final-score,
+report-{open,sheet,note,submit,sent,close}, open-admin, admin, admin-tab-{overview,reports,users}, stat-users, stat-reports,
+report-status-{open,resolved,all}, report-list, report-item, report-{resolve,reopen,delete,delete-confirm,edit-card}, admin-toast, user-list,
+admin-tab-cards, card-groups, card-group-<id>, admin-card-list, admin-card-<key>, card-{edit,delete,delete-confirm,add,save},
+card-editor, card-editor-text, card-reports, card-reports-resolve.
 
 ## React Native Migration Path
 Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) ports **unchanged**. Map:
@@ -168,6 +206,14 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-10-19 - v1.10: admin **card editor** (`#/admin/cards`): browse every category / game / power card, edit, delete,
+  add; "לקלף" on a report jumps to that card. Edited content saved to `backend/data/questions.json` with backups.
+- 2026-10-19 - v1.9: **admin panel** (`#/admin`: overview, card reports queue, users) and a **report button** on every
+  card in every mini-game (flag at the right of the hint row -> sheet with reason chips + note). Admin account
+  `admin` seeded from `ADMIN_PASSWORD_HASH` in gitignored `backend/.env`. DB schema v4 (`users.is_admin`, `card_reports`).
+- 2026-10-19 - v1.8: category picker replaced by **mini-games** (`games` in JSON, `#/select` = `GameSelect.jsx`), all
+  categories in every game: שיחה פתוחה (classic), זה או זה (90 own would-you-rather dilemmas), מה יענה? (all guesses,
+  score + winner on the done screen), סבב מהיר (20 s auto timer per question, only 10 s challenges), שניכם עונים. Every game has 90 questions.
 - 2026-10-19 - v1.7: login required to play; couple's names saved on the account (register asks both); ✓ on a card
   checks it off and jumps to the next one; Home "עניתם" button → `#/answered` list where unchecking puts the card back
   in the deck. DB schema v2 (`users.partner_enc`, `answered_cards`, auto-migrated).

@@ -1,11 +1,11 @@
 import {
   Coffee, Sparkles, Compass, Sunrise, House, Laugh, Timer, Repeat, Layers, SkipForward,
-  HandHeart, MessageCircleQuestion, LayoutGrid, Hand, MoveHorizontal, Zap, Lightbulb,
+  HandHeart, MessageCircleQuestion, LayoutGrid, Hand, MoveHorizontal, Zap, Lightbulb, Shuffle, ArrowLeftRight,
 } from "lucide-react";
 
 const ICONS = {
   Coffee, Sparkles, Compass, Sunrise, Home: House, Laugh, Timer, Repeat, Layers, SkipForward,
-  HandHeart, MessageCircleQuestion, LayoutGrid, Hand, MoveHorizontal, Zap, Lightbulb,
+  HandHeart, MessageCircleQuestion, LayoutGrid, Hand, MoveHorizontal, Zap, Lightbulb, Shuffle, ArrowLeftRight,
 };
 
 export const iconFor = (name) => ICONS[name] ?? Sparkles;

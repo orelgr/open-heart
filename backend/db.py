@@ -13,7 +13,7 @@ from pathlib import Path
 DATA_DIR = Path(os.getenv("DATA_DIR", Path(__file__).resolve().parent / "data"))
 DB_FILE = DATA_DIR / "open_heart.db"
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS users (
     email_enc       BLOB    NOT NULL,                 -- AES-256-GCM
     name_enc        BLOB    NOT NULL,                 -- AES-256-GCM (player 1)
     partner_enc     BLOB,                             -- AES-256-GCM (player 2, the partner's name)
+    name_lookup     BLOB,                             -- HMAC(normalized name): sign in with either name
+    partner_lookup  BLOB,                             --   (not unique: many couples share a name)
     password_hash   TEXT    NOT NULL,                 -- Argon2id (PHC string, includes salt + params)
     consent_version TEXT    NOT NULL,                 -- privacy notice version accepted at sign-up
     consent_at      INTEGER NOT NULL,
@@ -30,7 +32,8 @@ CREATE TABLE IF NOT EXISTS users (
     locked_until    INTEGER NOT NULL DEFAULT 0,
     created_at      INTEGER NOT NULL,
     updated_at      INTEGER NOT NULL,
-    last_login_at   INTEGER
+    last_login_at   INTEGER,
+    is_admin        INTEGER NOT NULL DEFAULT 0        -- the env-managed admin account (see admin.ensure_admin)
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -50,6 +53,22 @@ CREATE TABLE IF NOT EXISTS answered_cards (
     answered_at INTEGER NOT NULL,
     PRIMARY KEY (user_id, card_key)
 ) STRICT, WITHOUT ROWID;
+
+-- "Something's wrong with this card" reports from players, triaged in the admin panel.
+-- card_text is a snapshot, so a report still makes sense after the card is edited.
+CREATE TABLE IF NOT EXISTS card_reports (
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    card_key    TEXT    NOT NULL,
+    game_id     TEXT,
+    card_text   TEXT    NOT NULL,
+    reason      TEXT    NOT NULL,
+    note        TEXT    NOT NULL DEFAULT '',
+    status      TEXT    NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+    created_at  INTEGER NOT NULL,
+    resolved_at INTEGER
+) STRICT;
+CREATE INDEX IF NOT EXISTS card_reports_status ON card_reports(status, created_at);
 
 -- Throttling buckets (per IP / per account), pruned continuously.
 CREATE TABLE IF NOT EXISTS rate_events (
@@ -93,6 +112,13 @@ def init_db() -> None:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
         if "partner_enc" not in cols:  # v1 -> v2
             conn.execute("ALTER TABLE users ADD COLUMN partner_enc BLOB")
+        for col in ("name_lookup", "partner_lookup"):  # v2 -> v3 (values backfilled by auth.backfill_name_lookups)
+            if col not in cols:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} BLOB")
+        if "is_admin" not in cols:  # v3 -> v4
+            conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS users_name_lookup ON users(name_lookup)")
+        conn.execute("CREATE INDEX IF NOT EXISTS users_partner_lookup ON users(partner_lookup)")
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
     for f in DATA_DIR.glob("open_heart.db*"):
         try:

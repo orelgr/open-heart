@@ -16,12 +16,15 @@ module.exports = {
       // SECRET_KEY (base64, 32+ random bytes) is read from the server's environment, never from git:
       //   python -c "import secrets,base64;print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
       // Without it, backend/data/secret.key is generated on first run (back it up separately from the DB).
+      // Admin account: App.py reads backend/.env (gitignored) -> ADMIN_PASSWORD_HASH='$argon2id$...'
+      //   create it on the server with: backend/.venv/bin/python backend/admin_hash.py --write
       env: {
         HOST: "127.0.0.1",
         PORT: "8000",
         CORS_ORIGINS: "https://openhearts.gmarup.com",
         COOKIE_SECURE: "1",
         ...(process.env.SECRET_KEY ? { SECRET_KEY: process.env.SECRET_KEY } : {}),
+        ...(process.env.ADMIN_PASSWORD_HASH ? { ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH } : {}),
       },
       max_memory_restart: "300M",
       autorestart: true,

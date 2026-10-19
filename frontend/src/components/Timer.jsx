@@ -5,9 +5,10 @@ import { Play, RotateCcw } from "lucide-react";
 const R = 34;
 const C = 2 * Math.PI * R;
 
-export default function Timer({ seconds = 10 }) {
+/** Countdown ring. `light` = for a light question card; `autoStart` = runs as soon as it is shown. */
+export default function Timer({ seconds = 10, light = false, autoStart = false }) {
   const [left, setLeft] = useState(seconds * 1000);
-  const [running, setRunning] = useState(false);
+  const [running, setRunning] = useState(autoStart);
   const raf = useRef(0);
 
   useEffect(() => {
@@ -36,15 +37,15 @@ export default function Timer({ seconds = 10 }) {
 
   return (
     <div className="flex flex-col items-center gap-3" data-no-flip>
-      <div className="relative size-24">
-        <svg viewBox="0 0 80 80" className="size-24 -rotate-90">
-          <circle cx="40" cy="40" r={R} stroke="rgb(255 255 255 / 0.12)" strokeWidth="4" fill="none" />
+      <div className={`relative ${light ? "size-20" : "size-24"}`}>
+        <svg viewBox="0 0 80 80" className={`${light ? "size-20" : "size-24"} -rotate-90`}>
+          <circle cx="40" cy="40" r={R} stroke={light ? "rgb(29 29 31 / 0.08)" : "rgb(255 255 255 / 0.12)"} strokeWidth="4" fill="none" />
           <circle
-            cx="40" cy="40" r={R} stroke="#D8BE8C" strokeWidth="4" fill="none" strokeLinecap="round"
+            cx="40" cy="40" r={R} stroke={light ? "#B8955A" : "#D8BE8C"} strokeWidth="4" fill="none" strokeLinecap="round"
             strokeDasharray={C} strokeDashoffset={C * (1 - left / (seconds * 1000))}
           />
         </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-3xl font-light tabular-nums text-white" data-testid="timer-value">
+        <span className={`absolute inset-0 flex items-center justify-center font-light tabular-nums ${light ? "text-2xl text-ink" : "text-3xl text-white"}`} data-testid="timer-value">
           {Math.ceil(left / 1000)}
         </span>
       </div>
@@ -52,7 +53,7 @@ export default function Timer({ seconds = 10 }) {
         <motion.button
           whileTap={{ scale: 0.95 }}
           onClick={start}
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-gold-soft px-5 text-[15px] font-medium text-night"
+          className={`inline-flex h-10 items-center gap-2 rounded-full px-5 text-[15px] font-medium ${light ? "bg-ink text-white" : "bg-gold-soft text-night"}`}
         >
           {done ? <RotateCcw size={16} /> : <Play size={16} />}
           {done ? "הזמן נגמר · שוב" : "הפעילו טיימר"}

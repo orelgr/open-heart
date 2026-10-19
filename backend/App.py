@@ -1,15 +1,13 @@
 """Open Heart (לבבות פתוחים) - FastAPI backend.
 
-Serves game content from questions.json and, in production, the built
+Serves game content from questions.json (or its admin-edited copy in data/) and, in production, the built
 frontend (frontend/dist) as a single-page app.
 
 Local:  python App.py            builds the frontend if needed, serves everything on http://localhost:8000
 PM2:    pm2 start ecosystem.config.js
 """
-import json
 import os
 from contextlib import asynccontextmanager
-from functools import lru_cache
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
@@ -17,12 +15,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from auth import COOKIE_SECURE, purge_expired, router as auth_router
-from cards import router as cards_router
-from db import closing_conn, init_db
-
 BASE_DIR = Path(__file__).resolve().parent
-DATA_FILE = BASE_DIR / "questions.json"
+
+
+def load_env_file(path: Path) -> None:
+    """backend/.env (gitignored, server-only secrets such as ADMIN_PASSWORD_HASH). Real env vars win."""
+    if not path.exists():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key, sep, value = line.strip().partition("=")
+        if sep and key and not key.startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
+load_env_file(BASE_DIR / ".env")  # before the imports below read their settings
+
+from admin import ensure_admin, router as admin_router  # noqa: E402
+from auth import COOKIE_SECURE, backfill_name_lookups, purge_expired, router as auth_router  # noqa: E402
+from cards import content as load_content, content_file, repo_newer, router as cards_router  # noqa: E402
+from db import closing_conn, init_db  # noqa: E402
 DIST_DIR = BASE_DIR.parent / "frontend" / "dist"
 
 
@@ -31,6 +42,10 @@ async def lifespan(_app: FastAPI):
     init_db()
     with closing_conn() as conn:
         purge_expired(conn)
+        backfill_name_lookups(conn)
+        ensure_admin(conn)
+    if repo_newer():
+        print(f"! backend/questions.json is newer than the admin-edited {content_file()}; the edited copy is served")
     yield
 
 
@@ -43,6 +58,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(cards_router)
+app.include_router(admin_router)
 
 # Strict CSP for the SPA: own scripts only, Google Fonts, inline style attributes (Framer Motion).
 CSP = (
@@ -63,17 +79,11 @@ async def security_headers(request: Request, call_next):
     h["Cross-Origin-Opener-Policy"] = "same-origin"
     if COOKIE_SECURE:
         h["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    if request.url.path.startswith(("/api/auth", "/api/cards")):
+    if request.url.path.startswith(("/api/auth", "/api/cards", "/api/admin")):
         h["Cache-Control"] = "no-store"  # personal data never lands in browser/proxy caches
     elif h.get("content-type", "").startswith("text/html"):
         h["Content-Security-Policy"] = CSP
     return res
-
-
-@lru_cache(maxsize=1)
-def load_content() -> dict:
-    with DATA_FILE.open(encoding="utf-8") as f:
-        return json.load(f)
 
 
 @app.get("/api/health")

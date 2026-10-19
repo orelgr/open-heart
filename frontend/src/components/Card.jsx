@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { animate, motion, useAnimate, useMotionValue, useMotionValueEvent, useTransform } from "framer-motion";
-import { Zap } from "lucide-react";
+import { Check, Lightbulb, Zap } from "lucide-react";
 import { LogoMark } from "./Logo.jsx";
 import Timer from "./Timer.jsx";
 import { iconFor, toneOf } from "../lib/icons.js";
+import { isGuess, turnLabel } from "../lib/players.js";
+
+const GUESS_HINT = "קודם מנחשים, ורק אז עונים";
 
 const SWIPE_DISTANCE = 110;
 const SWIPE_VELOCITY = 600;
@@ -57,12 +60,39 @@ const variants = {
   },
 };
 
+/** "We answered it": checks the card off (out of the deck) and moves on; tap again to uncheck. */
+function CheckButton({ checked, onCheck, dark = false, className = "" }) {
+  const idle = dark ? "border-gold-soft/40 text-gold-soft" : "border-ink/15 bg-white/70 text-ink-soft";
+  const on = dark ? "border-gold-soft bg-gold-soft text-night" : "border-sage bg-sage text-white";
+  return (
+    <motion.button
+      type="button"
+      data-no-flip
+      data-testid="card-check"
+      aria-pressed={checked}
+      aria-label={checked ? "ביטול הסימון" : "ענינו, לקלף הבא"}
+      title={checked ? "ביטול הסימון" : "ענינו, לקלף הבא"}
+      whileTap={{ scale: 0.86 }}
+      onPointerDown={(e) => e.stopPropagation()} // no drag / flip from the button
+      onClick={(e) => {
+        e.stopPropagation();
+        onCheck();
+      }}
+      className={`flex size-12 items-center justify-center rounded-full border transition-colors duration-200 ${checked ? on : idle} ${className}`}
+    >
+      <Check size={22} strokeWidth={2.4} />
+    </motion.button>
+  );
+}
+
 const faceBase = "absolute inset-0 overflow-hidden rounded-[var(--radius-card)] backface-hidden";
 
 /** Card back (face-down side). */
-export function CardBack({ item, hidden = false, visibility }) {
+export function CardBack({ item, turn, hidden = false, visibility }) {
   const pe = { pointerEvents: hidden ? "none" : undefined, visibility };
   if (item.kind === "power") {
+    const guess = item.type === "guess";
+    const BackIcon = guess ? Lightbulb : Zap;
     return (
       <motion.div className={`${faceBase} flex flex-col items-center justify-center gap-5 bg-night text-white`} style={pe}>
         <div className="pointer-events-none absolute inset-3 rounded-[22px] border border-gold-soft/30" />
@@ -71,10 +101,12 @@ export function CardBack({ item, hidden = false, visibility }) {
           transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
           className="flex size-20 items-center justify-center rounded-full bg-gold-soft/15"
         >
-          <Zap size={36} className="text-gold-soft" strokeWidth={1.6} />
+          <BackIcon size={36} className="text-gold-soft" strokeWidth={1.6} />
         </motion.div>
-        <p className="font-display text-3xl">קלף כוח</p>
-        <p className="text-sm tracking-wide text-white/55">הקישו לחשיפה</p>
+        <p className="font-display text-3xl">{guess ? "מה יענה?" : "קלף כוח"}</p>
+        <p className={turn ? "text-[15px] font-medium text-gold-soft" : "text-sm tracking-wide text-white/55"} data-testid={turn ? "turn" : undefined}>
+          {turn ?? "הקישו לחשיפה"}
+        </p>
       </motion.div>
     );
   }
@@ -93,14 +125,21 @@ export function CardBack({ item, hidden = false, visibility }) {
       <div className="flex size-28 items-center justify-center rounded-full bg-white/25">
         <LogoMark size={64} />
       </div>
-      <p className="pb-2 text-[13px] tracking-wide" style={{ color: tone.accent }}>
-        הקישו לחשיפה
-      </p>
+      {turn ? (
+        <p className="pb-1 text-[16px] font-medium text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.18)]" data-testid="turn">
+          {turn}
+        </p>
+      ) : (
+        <p className="pb-2 text-[13px] tracking-wide" style={{ color: tone.accent }}>
+          הקישו לחשיפה
+        </p>
+      )}
     </motion.div>
   );
 }
 
-function CardFront({ item, isTop, visibility }) {
+function CardFront({ item, turn, isTop, visibility, checked, onCheck }) {
+  const checkable = isTop && !!item.answerKey && !!onCheck;
   if (item.kind === "power") {
     const Icon = iconFor(item.icon);
     return (
@@ -112,6 +151,12 @@ function CardFront({ item, isTop, visibility }) {
         </div>
         <p className="font-display text-[26px] leading-snug">{item.text}</p>
         {item.type === "challenge" && isTop && <Timer seconds={item.seconds ?? 10} />}
+        {(turn || item.type === "guess") && (
+          <p className="absolute inset-x-0 bottom-9 text-[14px] font-medium text-gold-soft/90" data-testid={item.type === "guess" ? "guess-hint" : undefined}>
+            {turn ?? GUESS_HINT}
+          </p>
+        )}
+        {checkable && <CheckButton dark checked={checked} onCheck={onCheck} className="absolute bottom-6 left-6" />}
       </motion.div>
     );
   }
@@ -122,22 +167,36 @@ function CardFront({ item, isTop, visibility }) {
         <span className="size-2 rounded-full" style={{ background: tone.to }} />
         <span className="text-[13px] font-medium text-muted">{item.category.title}</span>
       </div>
-      <div className="flex flex-1 items-center">
+      <div className="flex flex-1 flex-col justify-center gap-4">
+        {item.guess && (
+          <span className="flex w-fit items-center gap-1.5 rounded-full bg-gold/12 px-3 py-1 text-[13px] font-medium text-[#7F5F2A]" data-testid="guess-hint">
+            <Lightbulb size={14} strokeWidth={1.9} />
+            {`מה יענה? ${GUESS_HINT}`}
+          </span>
+        )}
         <p className="font-display text-[28px] leading-[1.35] text-ink" data-testid="question-text">
           {item.text}
         </p>
       </div>
       <div className="flex items-center justify-between text-muted/70">
-        <span className="text-[12px] tracking-[0.2em]">OPEN HEART</span>
-        <LogoMark size={26} />
+        {turn ? (
+          <span className="flex items-center gap-2 text-[15px] font-medium text-ink-soft">
+            <span className="size-1.5 rounded-full bg-gold" />
+            {turn}
+          </span>
+        ) : (
+          <span className="text-[12px] tracking-[0.2em]">OPEN HEART</span>
+        )}
+        {checkable ? <CheckButton checked={checked} onCheck={onCheck} className="-my-2" /> : <LogoMark size={26} />}
       </div>
     </motion.div>
   );
 }
 
 /** One card in the stack. Only the top card (depth 0) can be dragged and flipped. */
-export default function Card({ item, depth, nav, onSwipe, progress }) {
+export default function Card({ item, players, depth, nav, onSwipe, progress, checked = false, onCheck }) {
   const isTop = depth === 0;
+  const turn = turnLabel(item, players);
   const [flipped, setFlipped] = useState(false);
   const ignoreTap = useRef(false);
   const leaving = useRef(false);
@@ -208,8 +267,8 @@ export default function Card({ item, depth, nav, onSwipe, progress }) {
           }`}
           style={{ rotateY: rotY }}
         >
-          <CardBack item={item} hidden={flipped} visibility={backVisibility} />
-          <CardFront item={item} isTop={isTop} visibility={frontVisibility} />
+          <CardBack item={item} turn={turn} hidden={flipped} visibility={backVisibility} />
+          <CardFront item={item} turn={turn} isTop={isTop} visibility={frontVisibility} checked={checked} onCheck={onCheck && (() => onCheck(item))} />
         </motion.div>
         {/* Light sweep while dragging */}
         <motion.div

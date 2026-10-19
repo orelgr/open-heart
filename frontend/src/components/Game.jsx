@@ -8,7 +8,7 @@ import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { LogoMark } from "./Logo.jsx";
 import { navigate } from "../lib/router.js";
 
-export default function Game({ content, deck, onRestart }) {
+export default function Game({ content, deck, players, answered, setCardAnswered, onRestart }) {
   const [index, setIndex] = useState(0);
   const [nav, setNav] = useState({ mode: "start", dir: -1, dragged: false, backFrom: -1 });
   const exitDirs = useRef([]);
@@ -33,6 +33,12 @@ export default function Game({ content, deck, onRestart }) {
     },
     [index, deck.length, progress]
   );
+  // ✓ on a card: it leaves the deck for next games and we go straight to the next card.
+  const check = (item) => {
+    if (answered.has(item.answerKey)) return setCardAnswered(item.answerKey, false);
+    setCardAnswered(item.answerKey, true);
+    advance(-1);
+  };
   const back = () => {
     if (index === 0) return;
     setNav({ mode: "back", dir: 1, dragged: false, backFrom: exitDirs.current[index - 1] ?? -1 });
@@ -106,7 +112,17 @@ export default function Game({ content, deck, onRestart }) {
           ) : (
             <AnimatePresence custom={nav}>
               {deck.slice(index, index + 3).map((item, depth) => (
-                <Card key={item.key} item={item} depth={depth} nav={nav} onSwipe={advance} progress={progress} />
+                <Card
+                  key={item.key}
+                  item={item}
+                  players={players}
+                  depth={depth}
+                  nav={nav}
+                  onSwipe={advance}
+                  progress={progress}
+                  checked={answered.has(item.answerKey)}
+                  onCheck={check}
+                />
               ))}
             </AnimatePresence>
           )}
@@ -116,7 +132,7 @@ export default function Game({ content, deck, onRestart }) {
       <div className={`flex flex-col gap-3 transition-opacity duration-200 ${shuffling ? "pointer-events-none opacity-0" : ""}`}>
         <div className="flex h-11 items-center justify-between">
           <span className="w-11" />
-          <p className="text-[13px] text-muted">{done ? "" : "הקישו להפיכה · החליקו להמשך"}</p>
+          <p className="text-[13px] text-muted">{done ? "" : "הקישו להפיכה · סמנו ✓ כשעניתם"}</p>
           {/* Floating, discreet rules button */}
           <motion.button
             whileTap={{ scale: 0.92 }}

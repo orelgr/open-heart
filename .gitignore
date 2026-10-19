@@ -20,3 +20,9 @@ Thumbs.db
 .playwright-mcp/
 test-results/
 playwright-report/
+# user database & encryption key (never commit)
+backend/data/
+*.db
+*.db-wal
+*.db-shm
+secret.key

@@ -28,23 +28,41 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 | `GET /api/content` | whole `questions.json` |
 | `GET /api/categories` / `/api/categories/{id}` | category list (no questions) / one category |
 | `GET /api/power-cards`, `GET /api/rules` | subsets |
+| `GET /api/auth/session` | `{user|null}` (no 401 for guests) |
+| `POST /api/auth/register` `login` `logout` `password` | account flows (JSON body, Origin-checked, rate-limited) |
+| `GET/PATCH/DELETE /api/auth/me`, `GET /api/auth/export` | profile, rename couple `{name,partner}`, delete (needs password), data export |
+| `GET /api/cards/answered`, `PUT`/`DELETE /api/cards/answered/{key}`, `DELETE /api/cards/answered` | checked-off cards: list, mark, unmark, reset all |
 | `GET /*` | built SPA (only if `frontend/dist` exists; path-traversal guarded) |
 
-Env vars: `HOST` (0.0.0.0), `PORT` (8000), `RELOAD` (1 = auto-reload), `CORS_ORIGINS` (comma list, default `*`).
+Env vars: `HOST` (0.0.0.0), `PORT` (8000), `RELOAD` (1 = auto-reload), `CORS_ORIGINS` (comma list, default `*`),
+`SECRET_KEY` (base64 ≥32 bytes; else `data/secret.key` is generated), `DATA_DIR` (`backend/data`), `COOKIE_SECURE`
+(1; set 0 only for plain-http LAN testing), `PASSWORD_MIN_LENGTH` (12), `HIBP_CHECK` (1), `AUDIT_RETENTION_DAYS` (365).
+
+### Accounts (required: every route except #/login #/register #/privacy shows login). Compliance: `SECURITY.md`
+SQLite (`db.py`, WAL, `STRICT`, `secure_delete`), connection per request. Email + name AES-256-GCM encrypted
+(AAD = `field:public_id`), email looked up via HMAC; passwords Argon2id; session = random token in HttpOnly
+`__Host-session` cookie, only its SHA-256 stored. Never cache `/api/auth` (SW skips it, `no-store`).
+Privacy notice text = `PRIVACY` in `Account.jsx`; bump `PRIVACY_VERSION` in `auth.py` when it changes.
+One account per couple: `name` + `partner` (encrypted) are the two player names, edited on Home (debounced PATCH).
+**Answered cards**: ✓ button on a flipped question / "מה יענה?" card (`CheckButton` in `Card.jsx`) marks it and
+advances; `buildDeck(content, ids, answered)` leaves marked cards out; `#/answered` lists them and unchecking returns a
+card to the deck. Key (`answerKey`) = `<categoryId>-<index>` or `pc-<powerCardId>`, so **append** new questions at
+the end of a category (reordering would shift keys).
 
 ### questions.json schema
 `meta{powerCardMinGap,powerCardMaxGap}` · `categories[{id,order,title,subtitle,icon,tone,questions[]}]` (6 × 15)
-· `powerCards[{id,type:"challenge"|"power",title,icon,text,seconds?}]` · `rules{intro,steps[{icon,title,text}],etiquette[],powerIntro}`.
+· `powerCards[{id,type:"challenge"|"power",turn:"single"|"both",nextTurn?:"both",title,icon,text,seconds?}]` · `rules{intro,steps[{icon,title,text}],etiquette[],powerIntro}`.
 `icon` = lucide-react name, mapped in `src/lib/icons.js` (add new names there). `tone` ∈ sand|gold|sage|sky|clay|plum.
 To add content, edit only the JSON — no frontend change needed.
 
 ## Folder structure
 ```
-backend/   App.py · questions.json · requirements.txt
+backend/   App.py · auth.py · cards.py · db.py · security.py · backup_db.py · questions.json · requirements.txt · data/ (gitignored)
 frontend/  index.html · vite.config.js (proxy /api → :8000) · public/{icon.svg,manifest.webmanifest,sw.js}
   src/  main.jsx · App.jsx (content load, routing, screen transitions) · index.css (Tailwind v4 @theme tokens)
-    lib/        api.js · router.js · deck.js · icons.js (icon map + category tones)
-    components/ ui.jsx (Button, IconButton, Screen, TopBar, Backdrop) · Logo.jsx · Home.jsx · Rules.jsx
+    lib/        api.js · auth.js · cards.js · router.js · deck.js · icons.js (icon map + category tones)
+    components/ ui.jsx (Button, IconButton, Screen, TopBar, Backdrop) · Logo.jsx · Home.jsx · Account.jsx · Answered.jsx (#/answered)
+                (AuthPage #/login #/register, AccountPage #/account, PrivacyPage #/privacy) · Rules.jsx
                 (RulesPage, RulesContent, RulesSheet) · CategorySelect.jsx · Game.jsx · Card.jsx · Timer.jsx
 ecosystem.config.js   PM2 process file
 ```
@@ -78,7 +96,15 @@ ecosystem.config.js   PM2 process file
 
 **Prereqs**: Python 3.10+, Node 20+.
 
-### Local (development, two terminals)
+### Local, one command (what you usually want)
+```bash
+backend/.venv/Scripts/python backend/App.py   # Windows; or press Run on App.py in VS Code (interpreter = backend/.venv)
+```
+Rebuilds `frontend/dist` when `frontend/src` / `public` changed (`npm install` too if needed), serves API + SPA on
+http://localhost:8000 and opens the browser. Refuses to start if the port is taken (an old server still running).
+`AUTO_BUILD=0` / `OPEN_BROWSER=0` turn those off; both are skipped automatically under PM2.
+
+### Local (development with hot reload, two terminals)
 ```bash
 # 1) Backend  → http://127.0.0.1:8000
 cd backend
@@ -112,7 +138,8 @@ Verified: home loads stats from Python API (90 questions/6 categories) · Home�
 down without flipping the card · rules FAB opens/closes sheet · no horizontal/body scroll · 0 console errors ·
 prod build served by FastAPI (`/`, `/sw.js`, `/api/content` → 200).
 Stable test hooks: `data-testid` = start, open-rules, home-stats, cat-<id>, play, card (`data-kind`, `data-flipped`),
-next, progress, rules-fab, rules-sheet, rules-close, timer-value, deck-done.
+next, progress, rules-fab, rules-sheet, rules-close, timer-value, deck-done, account, auth-{name,partner,email,password,consent,submit}, card-check, open-answered, answered-count,
+answered-list, answered-toggle, reset-confirm, account-name, logout, delete-confirm.
 
 ## React Native Migration Path
 Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) ports **unchanged**. Map:
@@ -141,6 +168,18 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-10-19 - v1.7: login required to play; couple's names saved on the account (register asks both); ✓ on a card
+  checks it off and jumps to the next one; Home "עניתם" button → `#/answered` list where unchecking puts the card back
+  in the deck. DB schema v2 (`users.partner_enc`, `answered_cards`, auto-migrated).
+- 2026-10-19 - v1.6: optional accounts on SQLite (register/login/logout, change password, export, delete), encrypted
+  PII, Argon2id, HIBP check, rate limits, CSP + security headers, privacy page, `SECURITY.md` (Amendment 13 / 2017
+  data-security regs / NIST 800-63B-4 / OWASP ASVS 5 mapping). Account button at the top of Home.
+- 2026-10-19 - v1.5: "מה יענה?" guess cards (`type:"guess"`, 6 cards, Lightbulb back): `card.player` answers, the other
+  guesses first. Power card "קלף הניחוש" (`nextTurn:"guess"`) turns the next question into a guess (`card.guess`, gold pill).
+- 2026-10-19 - v1.5: player names & turns. Home screen has two name inputs (saved in localStorage,
+  `lib/players.js`). `buildDeck` assigns `card.player` (0/1 alternating from a random starter, or "both" for
+  `turn:"both"` power cards and the question after a `nextTurn:"both"` card: mirror, choice). Cards show
+  "<name>, תורך לענות" / "שניכם עונים" on back and front (`data-testid="turn"`); hidden if a name is empty.
 - 2026-10-14 - v1.4: shuffle intro is now two acts (~4.7 s, `ShuffleIntro.jsx`): a 3D table riffle (split, halves hinge on their outer edge so the inner corners lift, cards release in place and interleave in the overlap, halves pushed together,
   alternating cascade, tap-square, then the table tilts up and shrinks) hands off to the helix bloom. Dark power cards
   (night + gold bolt, every 4th card) appear in both acts.

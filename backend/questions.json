@@ -162,6 +162,7 @@
     {
       "id": "ten-seconds",
       "type": "challenge",
+      "turn": "single",
       "title": "אתגר 10 שניות",
       "icon": "Timer",
       "text": "שלושה דברים שאת/ה אוהב/ת בעצמך, לפני שהשעון נגמר!",
@@ -170,14 +171,24 @@
     {
       "id": "ten-seconds-2",
       "type": "challenge",
+      "turn": "both",
       "title": "אתגר 10 שניות",
       "icon": "Timer",
       "text": "תארו אחד את השני בשלוש מילים בלבד. מוכנים? יאללה!",
       "seconds": 10
     },
     {
+      "id": "guess-1",
+      "type": "guess",
+      "turn": "single",
+      "title": "מה יענה?",
+      "icon": "Lightbulb",
+      "text": "איזה מאכל הכי מנחם אותך ביום רע?"
+    },
+    {
       "id": "ten-seconds-3",
       "type": "challenge",
+      "turn": "both",
       "title": "אתגר 10 שניות",
       "icon": "Timer",
       "text": "מנו כמה שיותר דברים משותפים שגיליתם עד עכשיו.",
@@ -186,6 +197,7 @@
     {
       "id": "ten-seconds-4",
       "type": "challenge",
+      "turn": "single",
       "title": "אתגר 10 שניות",
       "icon": "Timer",
       "text": "ספר/י על זיכרון ילדות שמח, בדיוק בעשר שניות.",
@@ -194,13 +206,24 @@
     {
       "id": "mirror",
       "type": "power",
+      "turn": "both",
+      "nextTurn": "both",
       "title": "קלף המראה",
       "icon": "Repeat",
       "text": "השאלה הבאה: שניכם עונים עליה. מי שמתחיל/ה בוחר/ת."
     },
     {
+      "id": "guess-2",
+      "type": "guess",
+      "turn": "single",
+      "title": "מה יענה?",
+      "icon": "Lightbulb",
+      "text": "יום חופש פתאומי באמצע השבוע: מה הדבר הראשון שאת/ה עושה?"
+    },
+    {
       "id": "deeper",
       "type": "power",
+      "turn": "single",
       "title": "קלף העמקה",
       "icon": "Layers",
       "text": "מותר לשאול שאלת המשך אחת על התשובה האחרונה ששמעתם."
@@ -208,13 +231,23 @@
     {
       "id": "pass",
       "type": "power",
+      "turn": "single",
       "title": "קלף מעבר",
       "icon": "SkipForward",
       "text": "שמרו את הקלף הזה: אפשר לדלג בו על שאלה אחת בהמשך, בלי הסברים."
     },
     {
+      "id": "guess-3",
+      "type": "guess",
+      "turn": "single",
+      "title": "מה יענה?",
+      "icon": "Lightbulb",
+      "text": "איזו מעצמה היית בוחר/ת: לעוף, להיות בלתי נראה/ית או לקרוא מחשבות?"
+    },
+    {
       "id": "gratitude",
       "type": "power",
+      "turn": "both",
       "title": "קלף הכרת הטוב",
       "icon": "HandHeart",
       "text": "כל אחד אומר דבר אחד שהוא מעריך בשני מהמפגש הזה."
@@ -222,6 +255,7 @@
     {
       "id": "your-question",
       "type": "power",
+      "turn": "single",
       "title": "קלף השאלה שלי",
       "icon": "MessageCircleQuestion",
       "text": "במקום הקלף הבא, שאל/י שאלה משלך שמסקרנת אותך."
@@ -229,14 +263,24 @@
     {
       "id": "ten-seconds-5",
       "type": "challenge",
+      "turn": "single",
       "title": "אתגר 10 שניות",
       "icon": "Timer",
       "text": "שלושה מקומות שאת/ה חולם/ת לבקר בהם, לפני שהשעון נגמר!",
       "seconds": 10
     },
     {
+      "id": "guess-4",
+      "type": "guess",
+      "turn": "single",
+      "title": "מה יענה?",
+      "icon": "Lightbulb",
+      "text": "חופשה בחלומות: חוף ים, עיר גדולה או בקתה ביער?"
+    },
+    {
       "id": "ten-seconds-6",
       "type": "challenge",
+      "turn": "both",
       "title": "אתגר 10 שניות",
       "icon": "Timer",
       "text": "תנו אחד לשני מחמאה כנה אחת. יש לכם 10 שניות.",
@@ -245,6 +289,7 @@
     {
       "id": "ten-seconds-7",
       "type": "challenge",
+      "turn": "both",
       "title": "אתגר 10 שניות",
       "icon": "Timer",
       "text": "תארו את היום המושלם שלכם במשפט אחד.",
@@ -253,6 +298,7 @@
     {
       "id": "moment",
       "type": "power",
+      "turn": "both",
       "title": "קלף הרגע",
       "icon": "Sparkles",
       "text": "עצרו לרגע, קחו נשימה ואמרו מה הכי נעים לכם בשיחה עד עכשיו."
@@ -260,6 +306,8 @@
     {
       "id": "choice",
       "type": "power",
+      "turn": "single",
+      "nextTurn": "both",
       "title": "קלף הבחירה",
       "icon": "Repeat",
       "text": "בחר/י מי משניכם עונה ראשון על השאלה הבאה."
@@ -267,9 +315,35 @@
     {
       "id": "memory",
       "type": "power",
+      "turn": "both",
       "title": "קלף הזיכרון",
       "icon": "HandHeart",
       "text": "שתפו רגע טוב אחד שהיה לכם בשבוע האחרון."
+    },
+    {
+      "id": "guess-5",
+      "type": "guess",
+      "turn": "single",
+      "title": "מה יענה?",
+      "icon": "Lightbulb",
+      "text": "מה הדבר הראשון שאת/ה עושה כשאת/ה קם/ה בבוקר?"
+    },
+    {
+      "id": "guess-6",
+      "type": "guess",
+      "turn": "single",
+      "title": "מה יענה?",
+      "icon": "Lightbulb",
+      "text": "באיזה תפקיד היית בקבוצת חברים: המארגן/ת, המצחיק/ה או זה/זו שמקשיב/ה?"
+    },
+    {
+      "id": "guess-power",
+      "type": "power",
+      "turn": "single",
+      "nextTurn": "guess",
+      "title": "קלף הניחוש",
+      "icon": "Lightbulb",
+      "text": "בשאלה הבאה: קודם את/ה מנחש/ת מה תהיה התשובה, ורק אז שומעים אותה."
     }
   ],
   "rules": {
@@ -283,7 +357,7 @@
       {
         "icon": "Hand",
         "title": "הופכים קלף",
-        "text": "הקישו על הקלף כדי לחשוף את השאלה. בכל תור אחד שואל והשני עונה, ואז מתחלפים."
+        "text": "הקישו על הקלף כדי לחשוף את השאלה. על כל קלף כתוב של מי התור לענות, ובקלפים מסוימים שניכם עונים."
       },
       {
         "icon": "MoveHorizontal",
@@ -293,7 +367,7 @@
       {
         "icon": "Zap",
         "title": "קלפי כוח",
-        "text": "מדי פעם יקפוץ קלף כוח או אתגר 10 שניות. עקבו אחרי ההוראה שעל הקלף."
+        "text": "מדי פעם יקפוץ קלף כוח, אתגר 10 שניות או 'מה יענה?'. עקבו אחרי ההוראה שעל הקלף."
       }
     ],
     "etiquette": [

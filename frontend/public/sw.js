@@ -1,5 +1,5 @@
 // Open Heart service worker: app-shell cache-first, API network-first.
-const CACHE = "open-heart-v1";
+const CACHE = "open-heart-v3";
 const SHELL = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
@@ -18,6 +18,7 @@ self.addEventListener("fetch", (e) => {
   const { request } = e;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
+  if (url.pathname.startsWith("/api/auth") || url.pathname.startsWith("/api/cards")) return; // personal data: never cached
   if (url.pathname.startsWith("/api/") || request.mode === "navigate") {
     e.respondWith(
       fetch(request)

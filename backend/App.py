@@ -3,30 +3,71 @@
 Serves game content from questions.json and, in production, the built
 frontend (frontend/dist) as a single-page app.
 
-Local:  python App.py            (http://127.0.0.1:8000)
+Local:  python App.py            builds the frontend if needed, serves everything on http://localhost:8000
 PM2:    pm2 start ecosystem.config.js
 """
 import json
 import os
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+from auth import COOKIE_SECURE, purge_expired, router as auth_router
+from cards import router as cards_router
+from db import closing_conn, init_db
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_FILE = BASE_DIR / "questions.json"
 DIST_DIR = BASE_DIR.parent / "frontend" / "dist"
 
-app = FastAPI(title="Open Heart API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    with closing_conn() as conn:
+        purge_expired(conn)
+    yield
+
+
+app = FastAPI(title="Open Heart API", version="1.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
     allow_methods=["GET"],
     allow_headers=["*"],
 )
+app.include_router(auth_router)
+app.include_router(cards_router)
+
+# Strict CSP for the SPA: own scripts only, Google Fonts, inline style attributes (Framer Motion).
+CSP = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; "
+    "worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    res = await call_next(request)
+    h = res.headers
+    h["X-Content-Type-Options"] = "nosniff"
+    h["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    h["X-Frame-Options"] = "DENY"
+    h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    h["Cross-Origin-Opener-Policy"] = "same-origin"
+    if COOKIE_SECURE:
+        h["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    if request.url.path.startswith(("/api/auth", "/api/cards")):
+        h["Cache-Control"] = "no-store"  # personal data never lands in browser/proxy caches
+    elif h.get("content-type", "").startswith("text/html"):
+        h["Content-Security-Policy"] = CSP
+    return res
 
 
 @lru_cache(maxsize=1)
@@ -81,12 +122,55 @@ if DIST_DIR.exists():
         return FileResponse(DIST_DIR / "index.html")
 
 
+def build_frontend_if_stale() -> None:
+    """One-command local run: (re)build frontend/dist when the React sources are newer than the last build."""
+    import shutil
+    import subprocess
+
+    frontend = BASE_DIR.parent / "frontend"
+    npm = shutil.which("npm")
+    if not npm:
+        print("! npm not found (install Node 20+); serving the existing build, if any.")
+        return
+    built = DIST_DIR / "index.html"
+    sources = [frontend / "index.html", frontend / "vite.config.js", *(frontend / "src").rglob("*"), *(frontend / "public").rglob("*")]
+    newest = max((p.stat().st_mtime for p in sources if p.is_file()), default=0)
+    if built.exists() and built.stat().st_mtime >= newest:
+        return
+    if not (frontend / "node_modules").exists():
+        print("> npm install")
+        subprocess.run([npm, "install"], cwd=frontend, check=True)
+    print("> npm run build")
+    subprocess.run([npm, "run", "build"], cwd=frontend, check=True)
+
+
+def port_busy(port: int) -> bool:
+    import socket
+
+    with socket.socket() as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
 if __name__ == "__main__":
+    import threading
+    import webbrowser
+
     import uvicorn
+
+    port = int(os.getenv("PORT", "8000"))
+    under_pm2 = "pm_id" in os.environ
+    if port_busy(port):
+        raise SystemExit(f"! Port {port} is already in use - an older server is probably still running. Stop it and retry.")
+    if os.getenv("AUTO_BUILD", "0" if under_pm2 else "1") == "1":
+        build_frontend_if_stale()
+    url = f"http://localhost:{port}"
+    print(f"\n  Open Heart -> {url}\n")
+    if not under_pm2 and os.getenv("OPEN_BROWSER", "1") == "1":
+        threading.Timer(1.5, webbrowser.open, [url]).start()
 
     uvicorn.run(
         "App:app",
         host=os.getenv("HOST", "0.0.0.0"),
-        port=int(os.getenv("PORT", "8000")),
+        port=port,
         reload=os.getenv("RELOAD", "0") == "1",
     )

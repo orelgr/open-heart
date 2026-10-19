@@ -51,7 +51,7 @@ export function RulesContent({ content, dense = false }) {
                 <Icon size={18} className="mt-0.5 shrink-0 text-gold-soft" strokeWidth={1.8} />
                 <div>
                   <p className="text-[15px] font-medium">{p.title}</p>
-                  <p className="text-[14px] leading-relaxed text-white/60">{p.type === "challenge" ? "משימה קצרה מול שעון של 10 שניות." : p.text}</p>
+                  <p className="text-[14px] leading-relaxed text-white/60">{p.type === "challenge" ? "משימה קצרה מול שעון של 10 שניות." : p.type === "guess" ? "אחד מנחש מה השני יענה, ורק אז השני עונה. מי קרוב יותר?" : p.text}</p>
                 </div>
               </div>
             );

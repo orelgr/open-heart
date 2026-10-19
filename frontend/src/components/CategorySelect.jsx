@@ -4,10 +4,12 @@ import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { iconFor, toneOf } from "../lib/icons.js";
 import { navigate } from "../lib/router.js";
 
-export default function CategorySelect({ content, selected, setSelected, onStart }) {
+export default function CategorySelect({ content, answered, selected, setSelected, onStart }) {
   const all = content.categories.map((c) => c.id);
   const allOn = selected.length === all.length;
-  const count = content.categories.filter((c) => selected.includes(c.id)).reduce((n, c) => n + c.questions.length, 0);
+  // Questions already checked off are out of the deck until unchecked on the "answered" page.
+  const left = (c) => c.questions.filter((_, i) => !answered.has(`${c.id}-${i}`)).length;
+  const count = content.categories.filter((c) => selected.includes(c.id)).reduce((n, c) => n + left(c), 0);
   const toggle = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
 
   return (
@@ -57,7 +59,7 @@ export default function CategorySelect({ content, selected, setSelected, onStart
                 <div className="min-w-0 flex-1">
                   <p className="text-[16px] font-semibold leading-snug">{c.title}</p>
                   <p className="text-[14px] text-muted">
-                    {c.subtitle} · {c.questions.length} שאלות
+                    {c.subtitle} · {left(c) === c.questions.length ? `${c.questions.length} שאלות` : `נשארו ${left(c)} מתוך ${c.questions.length}`}
                   </p>
                 </div>
                 <div
@@ -73,8 +75,8 @@ export default function CategorySelect({ content, selected, setSelected, onStart
         </div>
       </div>
       <div className="px-5 pt-3">
-        <Button className="w-full disabled:opacity-40" disabled={!selected.length} onClick={onStart} data-testid="play">
-          {selected.length ? `מתחילים · ${count} קלפים` : "בחרו לפחות עולם אחד"}
+        <Button className="w-full disabled:opacity-40" disabled={!count} onClick={onStart} data-testid="play">
+          {!selected.length ? "בחרו לפחות עולם אחד" : count ? `מתחילים · ${count} קלפים` : "עניתם על כל הקלפים כאן"}
         </Button>
       </div>
     </Screen>

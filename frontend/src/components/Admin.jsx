@@ -273,7 +273,7 @@ function Reports({ onChanged, toast }) {
       </div>
       {error && <p className="rounded-2xl bg-clay/15 px-4 py-3 text-[15px] text-[#8A4B37]">{error}</p>}
       {!rows ? (
-        <Skeleton />
+        !error && <Skeleton />
       ) : !groups.length ? (
         <Panel>
           <Empty icon={Flag}>{q ? "לא נמצאו דיווחים מתאימים" : status === "open" ? "אין דיווחים פתוחים. הכל נקי." : "אין דיווחים"}</Empty>
@@ -310,7 +310,7 @@ function Users() {
       </div>
       {error && <p className="rounded-2xl bg-clay/15 px-4 py-3 text-[15px] text-[#8A4B37]">{error}</p>}
       {!rows ? (
-        <Skeleton />
+        !error && <Skeleton />
       ) : !list.length ? (
         <Panel>
           <Empty>{q ? "לא נמצאו משתמשים" : "עוד אין משתמשים"}</Empty>
@@ -332,7 +332,13 @@ function Users() {
               {list.map((u) => (
                 <tr key={u.id} className="grid grid-cols-[1fr_auto] gap-x-3 border-b border-hairline px-5 py-3 last:border-0 md:table-row md:px-0 md:py-0">
                   <td className="md:px-5 md:py-3">
-                    <span className="font-medium text-ink">{u.partner ? `${u.name} ו${u.partner}` : u.name}</span>
+                    {u.broken ? (
+                      <span className="font-medium text-[#8A4B37]" title="הנתונים הוצפנו במפתח הצפנה אחר ולא ניתנים לפענוח">
+                        לא ניתן לפענוח
+                      </span>
+                    ) : (
+                      <span className="font-medium text-ink">{u.partner ? `${u.name} ו${u.partner}` : u.name}</span>
+                    )}
                   </td>
                   <td className="order-3 col-span-2 text-[13px] text-muted md:px-3 md:py-3" dir="ltr" style={{ textAlign: "right" }}>
                     {u.email}

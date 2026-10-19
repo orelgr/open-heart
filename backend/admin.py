@@ -211,13 +211,15 @@ def users(_admin: sqlite3.Row = Depends(require_admin), conn: sqlite3.Connection
     ).fetchall()
     out = []
     for r in rows:
-        info = user_out(r)
+        broken = not _decrypts(r)  # encrypted under another key: still listed, never fails the whole list
+        info = {"name": "", "partner": "", "email": ""} if broken else user_out(r)
         out.append(
             {
-                "id": info["id"],
+                "id": r["public_id"],
                 "name": info["name"],
                 "partner": info["partner"],
-                "email": mask_email(info["email"]),
+                "email": mask_email(info["email"]) if info["email"] else "—",
+                "broken": broken,
                 "createdAt": r["created_at"],
                 "lastActive": max(r["seen"] or 0, r["last_login_at"] or 0) or None,
                 "answered": r["answered"],

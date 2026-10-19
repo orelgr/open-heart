@@ -291,9 +291,15 @@ def name_lookups(name: str, partner: str) -> tuple[bytes | None, bytes | None]:
 
 
 def backfill_name_lookups(conn: sqlite3.Connection) -> None:
-    """Schema v3 migration: accounts created before name sign-in get their lookups once."""
-    for r in conn.execute("SELECT * FROM users WHERE name_lookup IS NULL").fetchall():
-        info = user_out(r)
+    """Schema v3 migration: accounts created before name sign-in get their lookups once.
+    The admin is skipped (it signs in as ADMIN_USERNAME, never by name); a row that can't be decrypted is
+    reported, not fatal, so one bad row can't keep the server from starting."""
+    for r in conn.execute("SELECT * FROM users WHERE name_lookup IS NULL AND is_admin = 0").fetchall():
+        try:
+            info = user_out(r)
+        except Exception as e:  # noqa: BLE001 - InvalidTag (other key) / ValueError (bad blob)
+            print(f"! user {r['id']}: cannot decrypt ({type(e).__name__}); was it encrypted with another SECRET_KEY?")
+            continue
         conn.execute(
             "UPDATE users SET name_lookup = ?, partner_lookup = ? WHERE id = ?", (*name_lookups(info["name"], info["partner"]), r["id"])
         )

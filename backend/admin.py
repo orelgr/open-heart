@@ -69,14 +69,33 @@ def ensure_admin(conn: sqlite3.Connection) -> None:
                 ),
             )
             print(f"  Admin account created: sign in as '{ADMIN_USERNAME}'")
-        elif row["password_hash"] != pw_hash or not row["is_admin"]:
+        elif row["password_hash"] != pw_hash or not row["is_admin"] or not _decrypts(row):
+            pid = row["public_id"]
+            # Re-encrypt with the current key: a row written under another key would otherwise break every read.
+            name, partner = ("מנהל", "") if not _decrypts(row) else (user_out(row)["name"], user_out(row)["partner"])
             conn.execute(
                 "UPDATE users SET is_admin = 1, password_hash = ?, failed_logins = 0, locked_until = 0, name_lookup = NULL, "
-                "partner_lookup = NULL, updated_at = ? WHERE id = ?",
-                (pw_hash, t, row["id"]),
+                "partner_lookup = NULL, email_lookup = ?, email_enc = ?, name_enc = ?, partner_enc = ?, updated_at = ? WHERE id = ?",
+                (
+                    pw_hash,
+                    sec.email_lookup(email),
+                    sec.encrypt(email, "email:" + pid),
+                    sec.encrypt(name, "name:" + pid),
+                    sec.encrypt(partner, "partner:" + pid),
+                    t,
+                    row["id"],
+                ),
             )
             conn.execute("DELETE FROM sessions WHERE user_id = ?", (row["id"],))  # new password -> sign out everywhere
             print(f"  Admin password updated from ADMIN_PASSWORD_HASH (sign in as '{ADMIN_USERNAME}')")
+
+
+def _decrypts(row: sqlite3.Row) -> bool:
+    try:
+        user_out(row)
+        return True
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def mask_email(email: str) -> str:

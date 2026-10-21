@@ -28,7 +28,8 @@ function groupsOf(content) {
         title: g.title,
         tone: g.tone,
         kind: "pair",
-        cards: g.questions.map((options, i) => ({ key: `${g.id}-${i}`, n: i + 1, options, text: options.join(" או ") })),
+        topic: g.format === "topic", // [title, prompt] instead of [a, b]
+        cards: g.questions.map((options, i) => ({ key: `${g.id}-${i}`, n: i + 1, options, text: options.join(g.format === "topic" ? ": " : " או ") })),
       })),
     {
       id: "power",
@@ -46,7 +47,9 @@ const inputCls =
   "w-full rounded-2xl border border-ink/10 bg-white/80 px-4 py-3 text-[16px] leading-relaxed text-ink outline-none ring-gold/60 focus:ring-2";
 
 /** Inline editor for one card (also used to add a card). */
-function CardEditor({ kind, card, onSave, onCancel, busy }) {
+const PLACEHOLDERS = { pair: ["אפשרות ראשונה", "אפשרות שנייה"], topic: ["כותרת הנושא", "שורת פתיחה"] };
+
+function CardEditor({ kind, topic, card, onSave, onCancel, busy }) {
   const [text, setText] = useState(card?.text ?? "");
   const [title, setTitle] = useState(card?.title ?? "");
   const [options, setOptions] = useState(card?.options ?? ["", ""]);
@@ -70,7 +73,7 @@ function CardEditor({ kind, card, onSave, onCancel, busy }) {
             value={o}
             maxLength={OPTION_MAX}
             onChange={(e) => setOptions(options.map((v, j) => (j === i ? e.target.value : v)))}
-            placeholder={i === 0 ? "אפשרות ראשונה" : "אפשרות שנייה"}
+            placeholder={PLACEHOLDERS[topic ? "topic" : "pair"][i]}
             className={`${inputCls} font-display`}
           />
         ))
@@ -129,7 +132,7 @@ function CardRow({ label, group, card, reports, focused, editing, setEditing, on
       data-testid={`admin-card-${card.key}`}
     >
       {editing ? (
-        <CardEditor kind={group.kind} card={card} busy={busy} onSave={(body) => onSave(card.key, body)} onCancel={() => setEditing(null)} />
+        <CardEditor kind={group.kind} topic={group.topic} card={card} busy={busy} onSave={(body) => onSave(card.key, body)} onCancel={() => setEditing(null)} />
       ) : (
         <div className="flex items-start gap-3">
           <span className="mt-1 w-6 shrink-0 text-[12px] tabular-nums text-muted/70">{card.n}</span>
@@ -418,7 +421,7 @@ export default function AdminCards({ focusKey, onChanged, onContent, toast }) {
           >
             {editing === "new" && (
               <div className="mb-3 rounded-2xl border border-gold/40 bg-gold/5 p-3">
-                <CardEditor kind={group.kind} busy={busy} onSave={add} onCancel={() => setEditing(null)} />
+                <CardEditor kind={group.kind} topic={group.topic} busy={busy} onSave={add} onCancel={() => setEditing(null)} />
               </div>
             )}
             {group.cards.length ? (

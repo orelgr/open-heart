@@ -79,10 +79,12 @@ the end of a category (reordering would shift keys).
 
 ### questions.json schema
 `meta{powerCardMinGap,powerCardMaxGap}` · `categories[{id,order,title,subtitle,icon,tone,questions[]}]` (6 × 15)
-· `games[{id,title,subtitle,icon,tone,power:"all"|"none"|"guess"|"challenge"|"both",limit?,turn?:"both"|"guess",seconds?,score?,questions?:[[a,b]]}]`
+· `games[{id,title,subtitle,icon,tone,power:"all"|"none"|"guess"|"challenge"|"both",limit?,turn?:"both"|"guess",seconds?,score?,format?:"topic",questions?:[[a,b]]}]`
   (classic · rather "זה או זה" = own 90 `[a,b]` pairs instead of categories, card shows "מה הייתם מעדיפים?" a / או / b,
   key `rather-<index>` (also accepted by `backend/cards.py`), game object acts as the category · guess = every question a guess, "ניחוש נכון" button scores
-  for the guesser · rapid = `seconds` countdown auto-starts when a question is flipped · mirror = both answer everything)
+  for the guesser · rapid = `seconds` countdown auto-starts when a question is flipped · mirror = both answer everything · topics "נושאי שיחה" = `format:"topic"`, own 90 `[title, prompt]` topics, no power cards,
+  both answer; card shows the title + an opening line (`card.topic`), text `title: prompt` (`gameCardText` in deck.js, same in cards.py);
+  keep topics different from every other question/dilemma)
 · `powerCards[{id,type:"challenge"|"power",turn:"single"|"both",nextTurn?:"both",title,icon,text,seconds?}]` · `rules{intro,steps[{icon,title,text}],etiquette[],powerIntro}`.
 `icon` = lucide-react name, mapped in `src/lib/icons.js` (add new names there). `tone` ∈ sand|gold|sage|sky|clay|plum.
 To add content, edit only the JSON — no frontend change needed (if the admin already edited cards, the served file is
@@ -206,6 +208,8 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-10-21 - v1.11: new mini-game **נושאי שיחה** (`topics`): 90 open, creative conversation topics (title + opening line),
+  none repeating the other games. Works in the admin card editor (title / opening line fields), reports and ✓.
 - 2026-10-19 - v1.10: admin **card editor** (`#/admin/cards`): browse every category / game / power card, edit, delete,
   add; "לקלף" on a report jumps to that card. Edited content saved to `backend/data/questions.json` with backups.
 - 2026-10-19 - v1.9: **admin panel** (`#/admin`: overview, card reports queue, users) and a **report button** on every

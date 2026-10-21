@@ -81,8 +81,15 @@ async def security_headers(request: Request, call_next):
         h["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     if request.url.path.startswith(("/api/auth", "/api/cards", "/api/admin")):
         h["Cache-Control"] = "no-store"  # personal data never lands in browser/proxy caches
-    elif h.get("content-type", "").startswith("text/html"):
-        h["Content-Security-Policy"] = CSP
+    else:
+        if h.get("content-type", "").startswith("text/html"):
+            h["Content-Security-Policy"] = CSP
+        # Hashed build files never change; everything else (index.html, sw.js, manifest, /api/content) must be
+        # revalidated, or phones keep running an old app build from the HTTP cache after a deploy.
+        if request.url.path.startswith("/assets/"):
+            h.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+        else:
+            h.setdefault("Cache-Control", "no-cache")
     return res
 
 

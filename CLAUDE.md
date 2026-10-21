@@ -21,7 +21,8 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 - Deck building: questions are shuffled **together** (mixed), and a power card is dealt every `meta.powerCardMinGap`..`powerCardMaxGap` questions (3..5, never consecutive,
   none as the last card). Power cards are drawn without repetition until all 15 were used.
 - PWA: `public/manifest.webmanifest`, `public/sw.js` (navigations + API network-first, static assets cache-first),
-  registered only in production builds.
+  registered only in production builds. Server sends `Cache-Control: no-cache` for everything but hashed `/assets/*`
+  (immutable), so phones never keep an old build after a deploy; bump `CACHE` in sw.js when the shell changes.
 
 ### API (backend/App.py)
 | Route | Returns |
@@ -208,6 +209,8 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-10-21 - v1.11.1: cache headers (`no-cache` on index.html/sw.js/content, immutable assets) + sw cache v5: phones
+  were still running the old build after a deploy (topics shown as "זה או זה").
 - 2026-10-21 - v1.11: new mini-game **נושאי שיחה** (`topics`): 90 open, creative conversation topics (title + opening line),
   none repeating the other games. Works in the admin card editor (title / opening line fields), reports and ✓.
 - 2026-10-19 - v1.10: admin **card editor** (`#/admin/cards`): browse every category / game / power card, edit, delete,

@@ -20,11 +20,15 @@ const POWER_FILTERS = {
 
 /** Fallback when content has no "games" (old cached JSON): the classic mixed game. */
 export const CLASSIC = { id: "classic", power: "all" };
+/** Text of one of a game's own cards: a "זה או זה" pair [a, b], or a "נושאי שיחה" topic [title, prompt]. */
+export const gameCardText = (game, [a, b]) => (game.format === "topic" ? `${a}: ${b}` : `${a} או ${b}?`);
+
 export const gameOf = (content, id) => content.games?.find((g) => g.id === id) ?? content.games?.[0] ?? CLASSIC;
 
 /**
  * Build a play deck for a mini-game. Questions come from every category, shuffled together, unless
- * the game has its own `questions` ("זה או זה": pairs [a, b], the game itself stands in for the category).
+ * the game has its own `questions` (the game itself stands in for the category): "זה או זה" pairs [a, b]
+ * (card.options), or, with `format: "topic"`, "נושאי שיחה" topics [title, prompt] (card.topic).
  * - `limit` caps the number of questions; `power` picks which power cards are dealt (POWER_FILTERS),
  *   one every minGap..maxGap questions (never two in a row, never as the last card).
  * - `turn` "both": everyone answers every question; "guess": every question is a "מה יענה?" guess.
@@ -47,9 +51,9 @@ export function buildDeck(content, game = CLASSIC, answered = new Set()) {
       .filter((q) => !answered.has(q.answerKey));
   let questions = shuffle(
     game.questions
-      ? questionsOf({ ...game, questions: game.questions.map(([a, b]) => `${a} או ${b}?`) }).map((q) => ({
+      ? questionsOf({ ...game, questions: game.questions.map((pair) => gameCardText(game, pair)) }).map((q) => ({
           ...q,
-          options: game.questions[q.key.slice(game.id.length + 1)],
+          [game.format === "topic" ? "topic" : "options"]: game.questions[q.key.slice(game.id.length + 1)],
         }))
       : categories.flatMap(questionsOf)
   );

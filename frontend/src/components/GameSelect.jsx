@@ -7,7 +7,7 @@ import { navigate } from "../lib/router.js";
 
 /** Short feature chips under each mini-game ("20 קלפים", "טיימר 20 שנ׳", "ניקוד"). */
 const chipsOf = (g, count) => [
-  `${count} שאלות`,
+  `${count} ${g.format === "topic" ? "נושאים" : "שאלות"}`,
   g.seconds && `טיימר ${g.seconds} שנ׳`,
   g.score && "ניקוד",
   g.power === "none" ? "בלי קלפי כוח" : g.power === "all" && "קלפי כוח",

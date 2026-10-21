@@ -200,7 +200,14 @@ function CardFront({ item, turn, isTop, flipped, visibility, checked, onCheck, h
             {`מה יענה? ${GUESS_HINT}`}
           </span>
         )}
-        {item.options ? (
+        {item.topic ? (
+          // "נושאי שיחה": topic title + an opening line to expand on.
+          <div className="flex flex-col gap-3" data-testid="question-text">
+            <p className="font-display text-[30px] leading-[1.25] text-ink">{item.topic[0]}</p>
+            <span className="h-px w-12" style={{ background: tone.to }} />
+            <p className="text-[18px] leading-[1.55] text-ink-soft">{item.topic[1]}</p>
+          </div>
+        ) : item.options ? (
           // "זה או זה": two options with an "או" divider.
           <div className="flex flex-col gap-3 text-center" data-testid="question-text">
             <p className="text-[14px] font-medium tracking-wide text-muted">מה הייתם מעדיפים?</p>

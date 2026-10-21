@@ -1,3 +1,5 @@
+import { gameCardText } from "./deck.js";
+
 // Answered cards (checked off by the couple), stored per account in FastAPI.
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -19,7 +21,7 @@ export function answerableCards(content) {
   const map = new Map();
   for (const c of content.categories) c.questions.forEach((text, i) => map.set(`${c.id}-${i}`, { kind: "question", text, category: c }));
   for (const g of content.games ?? [])
-    (g.questions ?? []).forEach(([a, b], i) => map.set(`${g.id}-${i}`, { kind: "question", text: `${a} או ${b}?`, category: g }));
+    (g.questions ?? []).forEach((pair, i) => map.set(`${g.id}-${i}`, { kind: "question", text: gameCardText(g, pair), category: g }));
   for (const p of content.powerCards) if (p.type === "guess") map.set(`pc-${p.id}`, { kind: "power", ...p });
   return map;
 }

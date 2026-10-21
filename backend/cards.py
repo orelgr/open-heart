@@ -63,7 +63,8 @@ def card_index() -> dict[str, dict]:
     cards = {f"{c['id']}-{i}": {"text": q, "group": c["title"]} for c in data["categories"] for i, q in enumerate(c["questions"])}
     for g in data.get("games", []):
         for i, (a, b) in enumerate(g.get("questions", [])):
-            cards[f"{g['id']}-{i}"] = {"text": f"{a} או {b}?", "group": g["title"]}
+            text = f"{a}: {b}" if g.get("format") == "topic" else f"{a} או {b}?"  # topic [title, prompt] / pair
+            cards[f"{g['id']}-{i}"] = {"text": text, "group": g["title"]}
     for p in data["powerCards"]:
         cards[f"pc-{p['id']}"] = {"text": f"{p['title']}: {p['text']}", "group": "מה יענה?" if p.get("type") == "guess" else "קלף כוח"}
     return cards

@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { BookOpen, CircleCheck, CircleUserRound, LayoutDashboard } from "lucide-react";
 import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { LogoMark } from "./Logo.jsx";
+import { InstallButton } from "./Install.jsx";
 import { toneOf } from "../lib/icons.js";
 import { navigate } from "../lib/router.js";
 
@@ -11,13 +12,14 @@ const fan = [
   { rotate: 0, x: 0, y: 0, tone: null },
 ];
 
-export default function Home({ content, players, setPlayers, answeredCount, isAdmin }) {
+export default function Home({ content, players, setPlayers, answeredCount, isAdmin, onInstall }) {
   const total = content ? [...content.categories, ...(content.games ?? [])].reduce((n, c) => n + (c.questions?.length ?? 0), 0) : 0;
 
   return (
     <Screen className="items-center justify-between text-center">
       <div className="w-full">
         <TopBar
+          center={onInstall && <InstallButton onClick={onInstall} />}
           right={
             isAdmin && (
               <IconButton label="ניהול" onClick={() => navigate("/admin")} data-testid="open-admin">

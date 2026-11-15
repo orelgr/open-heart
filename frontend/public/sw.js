@@ -1,6 +1,6 @@
 // Open Heart service worker: app-shell cache-first, API network-first.
-const CACHE = "open-heart-v5";
-const SHELL = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
+const CACHE = "open-heart-v6";
+const SHELL = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest", "/apple-touch-icon.png", "/icon-192.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)));

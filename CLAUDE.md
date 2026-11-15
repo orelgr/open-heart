@@ -20,6 +20,12 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
   every game draws from all categories. `buildDeck(content, game, answered)` (`src/lib/deck.js`) applies the game.
 - Deck building: questions are shuffled **together** (mixed), and a power card is dealt every `meta.powerCardMinGap`..`powerCardMaxGap` questions (3..5, never consecutive,
   none as the last card). Power cards are drawn without repetition until all 15 were used.
+- **Install prompt** (`lib/install.js`, `Install.jsx`): detects ios / android / desktop and standalone (installed) mode.
+  In a phone browser the install sheet opens automatically on Home after sign-in (once per browser session,
+  sessionStorage) and a "התקנת האפליקציה" pill sits in the Home top bar; inside the installed app neither shows.
+  Android/desktop Chrome: `beforeinstallprompt` is captured in main.jsx and "התקנה עכשיו" opens the native dialog
+  (fallback: animated ⋮ menu steps). iOS has no install API, so the sheet animates Share → "הוספה למסך הבית" → "הוספה".
+  Desktop: no auto sheet, pill only when the browser offers install. PNG icons (`apple-touch-icon.png`, 192/512, maskable).
 - PWA: `public/manifest.webmanifest`, `public/sw.js` (navigations + API network-first, static assets cache-first),
   registered only in production builds. Server sends `Cache-Control: no-cache` for everything but hashed `/assets/*`
   (immutable), so phones never keep an old build after a deploy; bump `CACHE` in sw.js when the shell changes.
@@ -100,7 +106,7 @@ frontend/  index.html · vite.config.js (proxy /api → :8000) · public/{icon.s
     lib/        api.js · auth.js · cards.js · router.js · deck.js · icons.js (icon map + category tones)
     components/ ui.jsx (Button, IconButton, Screen, TopBar, Backdrop) · Logo.jsx · Home.jsx · Account.jsx · Answered.jsx (#/answered)
                 (AuthPage #/login #/register, AccountPage #/account, PrivacyPage #/privacy) · Rules.jsx
-                (RulesPage, RulesContent, RulesSheet) · GameSelect.jsx · Game.jsx · Card.jsx · Timer.jsx · Report.jsx · Admin.jsx (#/admin) · AdminCards.jsx · adminUi.jsx
+                (RulesPage, RulesContent, RulesSheet) · GameSelect.jsx · Game.jsx · Card.jsx · Timer.jsx · Report.jsx · Install.jsx · Admin.jsx (#/admin) · AdminCards.jsx · adminUi.jsx
 ecosystem.config.js   PM2 process file
 ```
 
@@ -180,7 +186,7 @@ answered-list, answered-toggle, reset-confirm, account-name, logout, delete-conf
 report-{open,sheet,note,submit,sent,close}, open-admin, admin, admin-tab-{overview,reports,users}, stat-users, stat-reports,
 report-status-{open,resolved,all}, report-list, report-item, report-{resolve,reopen,delete,delete-confirm,edit-card}, admin-toast, user-list,
 admin-tab-cards, card-groups, card-group-<id>, admin-card-list, admin-card-<key>, card-{edit,delete,delete-confirm,add,save},
-card-editor, card-editor-text, card-reports, card-reports-resolve.
+card-editor, card-editor-text, card-reports, card-reports-resolve, install-{open,sheet,close,prompt,ok,done,demo,steps}.
 
 ## React Native Migration Path
 Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) ports **unchanged**. Map:
@@ -209,6 +215,8 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-11-15 - v1.12: **install the app** sheet (auto after sign-in in a phone browser, Home pill, hidden in the
+  installed app): one-tap native install on Android/Chrome, animated Share → Add to Home Screen guide on iPhone.
 - 2026-10-21 - v1.11.1: cache headers (`no-cache` on index.html/sw.js/content, immutable assets) + sw cache v5: phones
   were still running the old build after a deploy (topics shown as "זה או זה").
 - 2026-10-21 - v1.11: new mini-game **נושאי שיחה** (`topics`): 90 open, creative conversation topics (title + opening line),

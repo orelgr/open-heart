@@ -7,6 +7,7 @@ import Game from "./components/Game.jsx";
 import { AccountPage, AuthPage, PrivacyPage } from "./components/Account.jsx";
 import AnsweredPage from "./components/Answered.jsx";
 import AdminPage from "./components/Admin.jsx";
+import { InstallSheet } from "./components/Install.jsx";
 import { Backdrop, Screen } from "./components/ui.jsx";
 import { LogoMark } from "./components/Logo.jsx";
 import { cacheContent, fetchContent, readCachedContent } from "./lib/api.js";
@@ -14,6 +15,7 @@ import { auth } from "./lib/auth.js";
 import { cards } from "./lib/cards.js";
 import { buildDeck, gameOf } from "./lib/deck.js";
 import { navigate, useRoute } from "./lib/router.js";
+import { autoShown, markAutoShown, useInstall } from "./lib/install.js";
 
 export default function App() {
   const route = useRoute();
@@ -23,6 +25,20 @@ export default function App() {
   const [deck, setDeck] = useState(null);
   const [user, setUser] = useState(undefined); // undefined = still checking the session
   const [answered, setAnswered] = useState(() => new Set());
+  const install = useInstall();
+  const [installOpen, setInstallOpen] = useState(false);
+  const closeInstall = useCallback(() => setInstallOpen(false), []);
+
+  // Phone in a browser tab (not the installed app): after sign-in, explain how to install. Once per session.
+  const onHome = !!user && content && (route === "/" || route === "");
+  useEffect(() => {
+    if (!onHome || install.standalone || install.platform === "desktop" || autoShown()) return;
+    const t = setTimeout(() => {
+      markAutoShown();
+      setInstallOpen(true);
+    }, 700);
+    return () => clearTimeout(t);
+  }, [onHome, install.standalone, install.platform]);
 
   // The couple's names live on the account; edits on Home are saved after a short pause.
   const players = [user?.name ?? "", user?.partner ?? ""];
@@ -141,7 +157,7 @@ export default function App() {
       />
     );
   } else {
-    screen = <Home key="home" content={content} players={players} setPlayers={setPlayers} answeredCount={answered.size} isAdmin={user.admin} />;
+    screen = <Home key="home" content={content} players={players} setPlayers={setPlayers} answeredCount={answered.size} isAdmin={user.admin} onInstall={install.offer ? () => setInstallOpen(true) : null} />;
   }
 
   return (
@@ -150,6 +166,7 @@ export default function App() {
       <AnimatePresence mode="wait" initial={false}>
         {screen}
       </AnimatePresence>
+      <InstallSheet open={installOpen} onClose={closeInstall} />
     </MotionConfig>
   );
 }

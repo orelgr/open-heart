@@ -51,7 +51,7 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 
 Env vars: `HOST` (0.0.0.0), `PORT` (8000), `RELOAD` (1 = auto-reload), `CORS_ORIGINS` (comma list, default `*`),
 `SECRET_KEY` (base64 ≥32 bytes; else `data/secret.key` is generated), `DATA_DIR` (`backend/data`), `COOKIE_SECURE`
-(1; set 0 only for plain-http LAN testing), `PASSWORD_MIN_LENGTH` (12), `HIBP_CHECK` (1), `AUDIT_RETENTION_DAYS` (365),
+(1; set 0 only for plain-http LAN testing), `PASSWORD_MIN_LENGTH` (5), `HIBP_CHECK` (0, off), `AUDIT_RETENTION_DAYS` (365),
 `ADMIN_PASSWORD_HASH` (Argon2id, from `python backend/admin_hash.py`), `ADMIN_USERNAME` (admin), `ADMIN_EMAIL` (admin@openhearts.local).
 `App.py` loads **`backend/.env`** (gitignored) before anything else; real env vars win.
 

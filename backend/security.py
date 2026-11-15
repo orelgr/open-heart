@@ -112,7 +112,7 @@ DUMMY_HASH = _ph.hash(secrets.token_urlsafe(16))
 def password_pwned(pw: str) -> bool:
     """Have I Been Pwned range API (k-anonymity: only the first 5 hex chars of SHA-1 leave the server).
     Fails open: if the service is unreachable, sign-up is not blocked."""
-    if os.getenv("HIBP_CHECK", "1") != "1":
+    if os.getenv("HIBP_CHECK", "0") != "1":
         return False
     digest = hashlib.sha1(normalize_password(pw).encode()).hexdigest().upper()
     prefix, suffix = digest[:5], digest[5:]

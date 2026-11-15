@@ -24,7 +24,7 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE", "1") != "0"
 COOKIE_NAME = "__Host-session" if COOKIE_SECURE else "session"
 SESSION_ABSOLUTE = 30 * 24 * 3600  # re-authenticate at least every 30 days (NIST AAL1)
 SESSION_IDLE = 7 * 24 * 3600
-PASSWORD_MIN = int(os.getenv("PASSWORD_MIN_LENGTH", "12"))
+PASSWORD_MIN = int(os.getenv("PASSWORD_MIN_LENGTH", "5"))
 PASSWORD_MAX = 128
 AUDIT_RETENTION_DAYS = int(os.getenv("AUDIT_RETENTION_DAYS", "365"))
 LOCK_AFTER = 5  # failed logins before per-account backoff kicks in
@@ -38,11 +38,6 @@ ADMIN_MANAGED = "סיסמת המנהל מנוהלת בשרת (ADMIN_PASSWORD_HAS
 ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip() not in ("", "*")}
 EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
-COMMON = {
-    "123456789012", "password1234", "qwertyuiop12", "111111111111", "123123123123", "iloveyou1234",
-    "aaaaaaaaaaaa", "abcdefghijkl", "qwerty123456", "123456123456", "password123!", "admin1234567",
-    "openheart123", "openhearts12", "levavotptuhim",
-}
 
 GENERIC_LOGIN_ERROR = "הפרטים או הסיסמה שגויים"
 NAME_LOGIN_ERROR = "השם או הסיסמה שגויים. אם השם נפוץ, נסו להתחבר עם המייל"
@@ -150,10 +145,8 @@ def check_password(pw: str, email: str, name: str) -> None:
         raise HTTPException(422, f"הסיסמה צריכה להכיל לפחות {PASSWORD_MIN} תווים")
     if len(pw) > PASSWORD_MAX:
         raise HTTPException(422, f"הסיסמה ארוכה מ-{PASSWORD_MAX} תווים")
-    low = pw.lower()
-    local = email.split("@")[0]
-    if low in COMMON or len(set(low)) < 4 or (len(local) >= 4 and local in low) or (len(name) >= 4 and name.lower() in low):
-        raise HTTPException(422, "הסיסמה צפויה מדי. נסו משפט קצר שרק אתם תזכרו")
+    if len(set(pw.lower())) < 4:
+        raise HTTPException(422, "הסיסמה צריכה לכלול לפחות 4 תווים שונים")
     if sec.password_pwned(pw):
         raise HTTPException(422, "הסיסמה הזו הופיעה בדליפות מידע מוכרות. בחרו סיסמה אחרת")
 

@@ -30,4 +30,4 @@ export const auth = {
   deleteAccount: (password) => call("/me", { method: "DELETE", body: { password } }),
 };
 
-export const PASSWORD_MIN = 12;
+export const PASSWORD_MIN = 5;

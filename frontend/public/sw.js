@@ -1,5 +1,5 @@
 // Open Heart service worker: app-shell cache-first, API network-first.
-const CACHE = "open-heart-v4";
+const CACHE = "open-heart-v5";
 const SHELL = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {

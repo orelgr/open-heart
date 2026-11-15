@@ -1,25 +1,69 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
+import { guideOf, useLoop } from "./GameDemo.jsx";
 import { iconFor, toneOf } from "../lib/icons.js";
 import { buildDeck, CLASSIC } from "../lib/deck.js";
 import { navigate } from "../lib/router.js";
 
-/** Short feature chips under each mini-game ("20 קלפים", "טיימר 20 שנ׳", "ניקוד"). */
-const chipsOf = (g, count) => [
-  `${count} ${g.format === "topic" ? "נושאים" : "שאלות"}`,
-  g.seconds && `טיימר ${g.seconds} שנ׳`,
-  g.score && "ניקוד",
-  g.power === "none" ? "בלי קלפי כוח" : g.power === "all" && "קלפי כוח",
-].filter(Boolean);
+/** One quiet line of facts under the game name ("90 שאלות · טיימר 20 שנ׳ · ניקוד"). */
+const factsOf = (g, count) =>
+  [
+    `${count} ${g.format === "topic" ? "נושאים" : "שאלות"}`,
+    g.seconds && `טיימר ${g.seconds} שנ׳`,
+    g.score && "ניקוד",
+    g.power === "none" ? "בלי קלפי כוח" : g.power === "all" && "קלפי כוח",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
-/** Pick a mini-game. Questions always come from every category, so there is nothing else to choose. */
-export default function GameSelect({ content, answered, gameId, setGameId, onStart }) {
-  const games = content.games?.length ? content.games : [{ ...CLASSIC, title: "שיחה פתוחה", subtitle: "", icon: "Shuffle", tone: "gold" }];
+const SWIPE = 50;
+
+/**
+ * Pick a mini-game. Top: a live, looping preview of how the selected game plays, with its 3 steps lit in
+ * sync. Below: a calm 3×2 grid of games. Questions always come from every category, so nothing else to choose.
+ */
+export default function GameSelect({
+  content,
+  answered,
+  players,
+  gameId,
+  setGameId,
+  onStart,
+}) {
+  const games = content.games?.length
+    ? content.games
+    : [
+        {
+          ...CLASSIC,
+          title: "שיחה פתוחה",
+          subtitle: "",
+          icon: "Shuffle",
+          tone: "gold",
+        },
+      ];
   // Questions already checked off are out of the deck until unchecked on the "answered" page.
-  const counts = Object.fromEntries(games.map((g) => [g.id, buildDeck(content, g, answered).filter((c) => c.kind === "question").length]));
-  const current = games.find((g) => g.id === gameId) ?? games[0];
+  const counts = Object.fromEntries(
+    games.map((g) => [
+      g.id,
+      buildDeck(content, g, answered).filter((c) => c.kind === "question")
+        .length,
+    ]),
+  );
+  const index = Math.max(
+    0,
+    games.findIndex((g) => g.id === gameId),
+  );
+  const current = games[index];
   const count = counts[current.id];
+  const tone = toneOf(current.tone);
+  const guide = guideOf(current);
+  const { phase, round } = useLoop(guide.timings, current.id);
+  const step = guide.stepOf[phase] ?? 0;
+  const Scene = guide.Scene;
+
+  const go = (d) =>
+    setGameId(games[(index + d + games.length) % games.length].id);
 
   return (
     <Screen className="!px-0">
@@ -32,60 +76,193 @@ export default function GameSelect({ content, answered, gameId, setGameId, onSta
           }
         />
       </div>
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
-        <h1 className="mt-4 font-display text-[36px] leading-tight">מה משחקים?</h1>
-        <p className="mb-6 mt-1 text-[15px] text-muted">בחרו משחקון. השאלות מגיעות מכל העולמות.</p>
-        <div className="grid gap-3" role="radiogroup" aria-label="משחקונים">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-4">
+        <h1 className="mt-2 font-display text-[32px] leading-tight">
+          מה משחקים?
+        </h1>
+
+        {/* Live preview. Swipe sideways to move between games. */}
+        <motion.div
+          className="relative mt-4 h-[232px] touch-pan-y overflow-hidden rounded-[28px] border border-white/70 shadow-[var(--shadow-soft)]"
+          animate={{
+            background: `linear-gradient(160deg, ${tone.from}66 0%, rgba(255,255,255,0.7) 60%, ${tone.to}33 100%)`,
+          }}
+          transition={{ duration: 0.4 }}
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.18}
+          onDragEnd={(_, info) => {
+            if (info.offset.x < -SWIPE) go(1);
+            else if (info.offset.x > SWIPE) go(-1);
+          }}
+          data-testid="game-preview"
+          aria-hidden
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={current.id}
+              className="absolute inset-0 flex items-center justify-center"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }}
+            >
+              <Scene
+                content={content}
+                game={current}
+                names={players}
+                phase={phase}
+                round={round}
+              />
+            </motion.div>
+          </AnimatePresence>
+        </motion.div>
+
+        {/* Name, facts and the 3 steps (the lit step follows the preview). */}
+        {/* Fixed height + overlapping crossfade, so the grid below never jumps between games. */}
+        <div className="relative mt-4 h-[120px]">
+          <AnimatePresence initial={false}>
+            <motion.section
+              key={current.id}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.22, delay: 0.05 }}
+              className="absolute inset-x-0 top-0 px-1"
+              aria-live="polite"
+            >
+              <div className="flex items-baseline justify-between gap-3">
+                <h2 className="font-display text-[24px] leading-tight">
+                  {current.title}
+                </h2>
+                <span className="shrink-0 text-[12.5px] text-muted">
+                  {factsOf(current, count)}
+                </span>
+              </div>
+              {guide.steps ? (
+                <ol
+                  className="mt-3 grid grid-cols-3 gap-2"
+                  data-testid="game-steps"
+                >
+                  {guide.steps.map((s, i) => {
+                    const on = i === step;
+                    return (
+                      <li
+                        key={s}
+                        className="relative flex flex-col items-start gap-1.5 pb-2"
+                      >
+                        <motion.span
+                          animate={{
+                            backgroundColor: on
+                              ? tone.accent
+                              : "rgba(29,29,31,0.06)",
+                            color: on ? "#fff" : "#6E6A64",
+                            scale: on ? 1.08 : 1,
+                          }}
+                          transition={{ duration: 0.25 }}
+                          className="flex size-6 items-center justify-center rounded-full text-[12px] font-semibold"
+                        >
+                          {i + 1}
+                        </motion.span>
+                        <motion.span
+                          animate={{ color: on ? "#1D1D1F" : "#8E8A84" }}
+                          transition={{ duration: 0.25 }}
+                          className="text-[13px] font-medium leading-snug"
+                        >
+                          {s}
+                        </motion.span>
+                        <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-ink/5" />
+                        {on && (
+                          <motion.span
+                            layoutId="step-bar"
+                            className="absolute inset-x-0 bottom-0 h-[2px] rounded-full"
+                            style={{ background: tone.accent }}
+                            transition={{
+                              type: "spring",
+                              stiffness: 420,
+                              damping: 36,
+                            }}
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                current.subtitle && (
+                  <p className="mt-2 text-[14px] leading-snug text-muted">
+                    {current.subtitle}
+                  </p>
+                )
+              )}
+            </motion.section>
+          </AnimatePresence>
+        </div>
+
+        {/* Games */}
+        <div
+          className="mt-2 grid grid-cols-3 gap-2.5"
+          role="radiogroup"
+          aria-label="משחקונים"
+        >
           {games.map((g, i) => {
             const on = g.id === current.id;
-            const tone = toneOf(g.tone);
+            const t = toneOf(g.tone);
             const Icon = iconFor(g.icon);
             return (
               <motion.button
                 key={g.id}
                 role="radio"
                 aria-checked={on}
+                aria-label={g.subtitle ? `${g.title}. ${g.subtitle}` : g.title}
                 data-testid={`game-${g.id}`}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.03, duration: 0.22 }}
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setGameId(g.id)}
-                className={`glass flex items-center gap-4 rounded-3xl p-3.5 text-right transition-[box-shadow,background-color] duration-200 ${
-                  on ? "!bg-white/90 ring-2 ring-ink/80" : ""
+                className={`relative flex flex-col items-center gap-2 rounded-[22px] px-1.5 pb-3 pt-3.5 transition-[background-color,box-shadow] duration-200 ${
+                  on
+                    ? "bg-white shadow-[0_10px_28px_-14px_rgb(31_36_51/0.45)]"
+                    : "glass"
                 }`}
               >
-                <div
-                  className="flex size-14 shrink-0 items-center justify-center rounded-2xl"
-                  style={{ background: `linear-gradient(155deg, ${tone.from}, ${tone.to})`, color: tone.accent }}
+                {on && (
+                  <motion.span
+                    layoutId="game-ring"
+                    className="pointer-events-none absolute inset-0 rounded-[22px]"
+                    style={{ boxShadow: `inset 0 0 0 2px ${t.accent}` }}
+                    transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                  />
+                )}
+                <motion.span
+                  animate={{ scale: on ? 1.06 : 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 28 }}
+                  className="flex size-11 items-center justify-center rounded-[14px]"
+                  style={{
+                    background: `linear-gradient(155deg, ${t.from}, ${t.to})`,
+                    color: t.accent,
+                  }}
                 >
-                  <Icon size={24} strokeWidth={1.7} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[16px] font-semibold leading-snug">{g.title}</p>
-                  {g.subtitle && <p className="text-[14px] leading-snug text-muted">{g.subtitle}</p>}
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {chipsOf(g, counts[g.id]).map((c) => (
-                      <span key={c} className="rounded-full bg-ink/6 px-2 py-0.5 text-[12px] font-medium text-ink-soft">
-                        {c}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <div
-                  className={`flex size-7 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                    on ? "border-ink" : "border-ink/20"
-                  }`}
+                  <Icon size={21} strokeWidth={1.8} />
+                </motion.span>
+                <span
+                  className={`text-[13.5px] leading-tight ${on ? "font-semibold text-ink" : "font-medium text-ink-soft"}`}
                 >
-                  {on && <span className="size-3.5 rounded-full bg-ink" />}
-                </div>
+                  {g.title}
+                </span>
               </motion.button>
             );
           })}
         </div>
       </div>
       <div className="px-5 pt-3">
-        <Button className="w-full disabled:opacity-40" disabled={!count} onClick={onStart} data-testid="play">
+        <Button
+          className="w-full disabled:opacity-40"
+          disabled={!count}
+          onClick={onStart}
+          data-testid="play"
+        >
           {count ? `מתחילים · ${current.title}` : "עניתם על כל הקלפים כאן"}
         </Button>
       </div>

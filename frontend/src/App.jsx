@@ -142,7 +142,7 @@ export default function App() {
   } else if (route === "/rules") {
     screen = <RulesPage key="rules" content={content} />;
   } else if (route === "/select") {
-    screen = <GameSelect key="select" content={content} answered={answered} gameId={gameId} setGameId={setGameId} onStart={startGame} />;
+    screen = <GameSelect key="select" content={content} answered={answered} players={players} gameId={gameId} setGameId={setGameId} onStart={startGame} />;
   } else if (route === "/play" && deck) {
     screen = (
       <Game

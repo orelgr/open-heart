@@ -149,18 +149,31 @@ export default function GameSelect({
                     return (
                       <li
                         key={s}
-                        className="relative flex flex-col items-start gap-1.5 pb-2"
+                        className="relative flex flex-col items-center gap-2 text-center"
                       >
+                        {/* Connector to the next step (to the left in RTL); fills once this step is done. */}
+                        {i < guide.steps.length - 1 && (
+                          <span
+                            className="absolute top-[13px] h-[2px] rounded-full bg-ink/8"
+                            style={{ right: "calc(50% + 22px)", left: "calc(-50% + 14px)" }}
+                          >
+                            <motion.span
+                              className="absolute inset-0 origin-right rounded-full"
+                              style={{ background: tone.accent }}
+                              animate={{ scaleX: step > i ? 1 : 0 }}
+                              transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+                            />
+                          </span>
+                        )}
                         <motion.span
                           animate={{
-                            backgroundColor: on
-                              ? tone.accent
-                              : "rgba(29,29,31,0.06)",
-                            color: on ? "#fff" : "#6E6A64",
-                            scale: on ? 1.08 : 1,
+                            backgroundColor: on || step > i ? tone.accent : "rgba(29,29,31,0.06)",
+                            color: on || step > i ? "#fff" : "#6E6A64",
+                            scale: on ? 1.12 : 1,
+                            boxShadow: on ? `0 0 0 4px ${tone.accent}26` : "0 0 0 0px rgba(0,0,0,0)",
                           }}
                           transition={{ duration: 0.25 }}
-                          className="flex size-6 items-center justify-center rounded-full text-[12px] font-semibold"
+                          className="relative flex size-7 items-center justify-center rounded-full text-[12.5px] font-semibold"
                         >
                           {i + 1}
                         </motion.span>
@@ -171,19 +184,6 @@ export default function GameSelect({
                         >
                           {s}
                         </motion.span>
-                        <span className="absolute inset-x-0 bottom-0 h-[2px] rounded-full bg-ink/5" />
-                        {on && (
-                          <motion.span
-                            layoutId="step-bar"
-                            className="absolute inset-x-0 bottom-0 h-[2px] rounded-full"
-                            style={{ background: tone.accent }}
-                            transition={{
-                              type: "spring",
-                              stiffness: 420,
-                              damping: 36,
-                            }}
-                          />
-                        )}
                       </li>
                     );
                   })}

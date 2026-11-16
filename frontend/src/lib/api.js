@@ -19,9 +19,18 @@ export function cacheContent(data) {
   }
 }
 
+/** Signed out: the cards are for signed-in couples only, so none stay on the device. */
+export function clearCachedContent() {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* storage unavailable - fine */
+  }
+}
+
 export async function fetchContent() {
-  const res = await fetch(`${API_BASE}/api/content`);
-  if (!res.ok) throw new Error(`API ${res.status}`);
+  const res = await fetch(`${API_BASE}/api/content`, { credentials: "same-origin" }); // needs the session cookie
+  if (!res.ok) throw Object.assign(new Error(`API ${res.status}`), { status: res.status });
   const data = await res.json();
   cacheContent(data);
   return data;

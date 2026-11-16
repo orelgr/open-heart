@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, Download, Eye, EyeOff, LogOut, Trash2 } from "lucide-react";
+import { ChevronRight, Download, Eye, EyeOff, Hammer, LogOut, Trash2 } from "lucide-react";
 import { Button, IconButton, Screen, TopBar } from "./ui.jsx";
 import { LogoMark } from "./Logo.jsx";
 import { auth, PASSWORD_MIN } from "../lib/auth.js";
@@ -63,7 +63,16 @@ export function AuthPage({ mode, onAuth }) {
   const [form, setForm] = useState({ email: "", name: "", partner: "", password: "", consent: false });
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [closed, setClosed] = useState(null); // sign-up frozen by the admin -> the message to show
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.type === "checkbox" ? e.target.checked : e.target.value }));
+
+  useEffect(() => {
+    if (!isRegister) return;
+    auth
+      .signup()
+      .then((s) => setClosed(s.open ? null : s.message))
+      .catch(() => {});
+  }, [isRegister]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -78,11 +87,31 @@ export function AuthPage({ mode, onAuth }) {
       onAuth(user);
       navigate("/");
     } catch (err) {
-      setError(err.message);
+      if (err.status === 503) setClosed(err.message); // frozen while the page was open
+      else setError(err.message);
     } finally {
       setBusy(false);
     }
   };
+
+  if (isRegister && closed)
+    return (
+      <Screen>
+        <BackBar to="/login" />
+        <div className="flex flex-1 flex-col items-center justify-center px-2 text-center" data-testid="signup-closed">
+          <div className="flex size-16 items-center justify-center rounded-full bg-gold/15 text-gold">
+            <Hammer size={28} strokeWidth={1.7} />
+          </div>
+          <h1 className="mt-5 font-display text-[30px] leading-tight">בשיפוצים</h1>
+          <p className="mt-2 max-w-xs text-[16px] leading-relaxed text-muted">{closed}</p>
+        </div>
+        <div className="flex flex-col gap-2 pt-6">
+          <Button type="button" onClick={() => navigate("/login")} className="w-full">
+            כבר יש לי חשבון
+          </Button>
+        </div>
+      </Screen>
+    );
 
   return (
     <Screen>

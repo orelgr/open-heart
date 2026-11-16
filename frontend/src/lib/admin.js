@@ -20,6 +20,8 @@ export const admin = {
   setStatus: (ids, status) => call("/reports", { method: "PATCH", body: { ids, status } }),
   remove: (ids) => call("/reports/delete", { method: "POST", body: { ids } }),
   users: () => call("/users"),
+  deleteUser: (id) => call(`/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  setSignupFrozen: (signupFrozen) => call("/settings", { method: "PATCH", body: { signupFrozen } }),
   // Card editor: each call returns { content, edited, repoNewer } (POST also the new card's key).
   content: () => call("/content"),
   editCard: (key, body) => call(`/cards/${encodeURIComponent(key)}`, { method: "PUT", body }),

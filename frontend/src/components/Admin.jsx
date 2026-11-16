@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronRight, Flag, PencilLine, RefreshCw, RotateCcw, ShieldAlert, Trash2 } from "lucide-react";
+import { Check, ChevronRight, Flag, Lock, PencilLine, RefreshCw, RotateCcw, ShieldAlert, Trash2, UserPlus } from "lucide-react";
 import AdminCards from "./AdminCards.jsx";
 import { ago, dateFmt, Empty, Panel, SearchBox, Segmented, Skeleton } from "./adminUi.jsx";
 import { IconButton } from "./ui.jsx";
@@ -48,10 +48,47 @@ function CardList({ rows, empty, unit }) {
   );
 }
 
-function Overview({ data }) {
+/** iOS-style switch: freezes sign-up (the register page then says the system is being renovated). */
+function SignupSwitch({ frozen, onChange }) {
+  return (
+    <section className={`glass flex items-center gap-4 rounded-3xl p-5 ${frozen ? "ring-1 ring-clay/40" : ""}`} data-testid="signup-panel">
+      <div
+        className={`flex size-11 shrink-0 items-center justify-center rounded-full ${
+          frozen ? "bg-clay/15 text-[#8A4B37]" : "bg-sage/15 text-sage"
+        }`}
+      >
+        {frozen ? <Lock size={19} strokeWidth={1.9} /> : <UserPlus size={19} strokeWidth={1.9} />}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[16px] font-semibold text-ink">הקפאת הרשמה</p>
+        <p className="mt-0.5 text-[13px] leading-snug text-muted">
+          {frozen
+            ? "פעיל: אי אפשר ליצור חשבונות חדשים. מי שמנסה יראה \"המערכת כרגע בשיפוצים\". חשבונות קיימים ממשיכים כרגיל."
+            : "כבוי: כל אחד יכול ליצור חשבון חדש."}
+        </p>
+      </div>
+      <button
+        role="switch"
+        aria-checked={frozen}
+        aria-label="הקפאת הרשמה"
+        onClick={() => onChange(!frozen)}
+        className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors duration-200 ${frozen ? "bg-[#8A4B37]" : "bg-ink/15"}`}
+        data-testid="signup-freeze"
+      >
+        <span
+          className="absolute top-[2px] size-[27px] rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.18)] transition-[inset-inline-start] duration-200"
+          style={{ insetInlineStart: frozen ? 22 : 2 }}
+        />
+      </button>
+    </section>
+  );
+}
+
+function Overview({ data, onFrozen }) {
   if (!data) return <Skeleton />;
   return (
     <div className="grid gap-4">
+      <SignupSwitch frozen={data.signupFrozen} onChange={onFrozen} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="זוגות רשומים" value={data.users} sub={data.newUsers ? `+${data.newUsers} השבוע` : "אין חדשים השבוע"} testid="stat-users" />
         <Stat label="פעילים השבוע" value={data.activeUsers} sub={data.users ? `${Math.round((data.activeUsers / data.users) * 100)}% מהזוגות` : null} />
@@ -292,7 +329,45 @@ function Reports({ onChanged, toast }) {
 }
 
 /* ---------- Users ---------- */
-function Users() {
+function DeleteUser({ user, onDelete }) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!confirm)
+    return (
+      <button
+        onClick={() => setConfirm(true)}
+        aria-label="מחיקת החשבון"
+        title="מחיקת החשבון"
+        className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-ink/5"
+        data-testid="user-delete"
+      >
+        <Trash2 size={16} strokeWidth={1.8} />
+      </button>
+    );
+  return (
+    <span className="flex items-center gap-1">
+      <button onClick={() => setConfirm(false)} className="h-9 px-2 text-[13px] text-muted">
+        ביטול
+      </button>
+      <button
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          if (!(await onDelete(user))) {
+            setBusy(false);
+            setConfirm(false);
+          }
+        }}
+        className="h-9 whitespace-nowrap rounded-full bg-[#8A4B37] px-3 text-[13px] font-medium text-white disabled:opacity-60"
+        data-testid="user-delete-confirm"
+      >
+        מחיקה לצמיתות
+      </button>
+    </span>
+  );
+}
+
+function Users({ onChanged, toast }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [q, setQ] = useState("");
@@ -300,6 +375,18 @@ function Users() {
     admin.users().then(setRows).catch((e) => setError(e.message));
   }, []);
   const needle = q.trim().toLowerCase();
+  const remove = async (u) => {
+    try {
+      await admin.deleteUser(u.id);
+      setRows((rs) => rs.filter((r) => r.id !== u.id));
+      onChanged();
+      toast("החשבון נמחק");
+      return true;
+    } catch (e) {
+      setError(e.message);
+      return false;
+    }
+  };
   const list = (rows ?? []).filter((u) => !needle || `${u.name} ${u.partner} ${u.email}`.toLowerCase().includes(needle));
 
   return (
@@ -325,12 +412,13 @@ function Users() {
                 <th className="px-3 py-3 font-medium">הצטרפו</th>
                 <th className="px-3 py-3 font-medium">פעילות אחרונה</th>
                 <th className="px-3 py-3 text-left font-medium">נענו</th>
-                <th className="px-5 py-3 text-left font-medium">דיווחים</th>
+                <th className="px-3 py-3 text-left font-medium">דיווחים</th>
+                <th className="w-12 px-3 py-3" aria-label="פעולות" />
               </tr>
             </thead>
             <tbody>
               {list.map((u) => (
-                <tr key={u.id} className="grid grid-cols-[1fr_auto] gap-x-3 border-b border-hairline px-5 py-3 last:border-0 md:table-row md:px-0 md:py-0">
+                <tr key={u.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-3 border-b border-hairline px-5 py-3 last:border-0 md:table-row md:px-0 md:py-0">
                   <td className="md:px-5 md:py-3">
                     {u.broken ? (
                       <span className="font-medium text-[#8A4B37]" title="הנתונים הוצפנו במפתח הצפנה אחר ולא ניתנים לפענוח">
@@ -340,13 +428,16 @@ function Users() {
                       <span className="font-medium text-ink">{u.partner ? `${u.name} ו${u.partner}` : u.name}</span>
                     )}
                   </td>
-                  <td className="order-3 col-span-2 text-[13px] text-muted md:px-3 md:py-3" dir="ltr" style={{ textAlign: "right" }}>
+                  <td className="order-3 col-span-3 text-[13px] text-muted md:px-3 md:py-3" dir="ltr" style={{ textAlign: "right" }}>
                     {u.email}
                   </td>
                   <td className="hidden text-muted md:table-cell md:px-3 md:py-3">{dateFmt.format(u.createdAt * 1000)}</td>
                   <td className="text-[13px] text-muted md:px-3 md:py-3 md:text-[14px]">{ago(u.lastActive)}</td>
                   <td className="hidden text-left tabular-nums md:table-cell md:px-3 md:py-3">{u.answered}</td>
-                  <td className="hidden text-left tabular-nums md:table-cell md:px-5 md:py-3">{u.reports || "—"}</td>
+                  <td className="hidden text-left tabular-nums md:table-cell md:px-3 md:py-3">{u.reports || "—"}</td>
+                  <td className="md:px-3 md:py-2">
+                    <DeleteUser user={u} onDelete={remove} />
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -385,6 +476,17 @@ export default function AdminPage({ route, onContent }) {
     timer.current = setTimeout(() => setNotice(null), 5000);
   }, []);
   useEffect(() => () => clearTimeout(timer.current), []);
+
+  const setFrozen = async (frozen) => {
+    setOverview((o) => ({ ...o, signupFrozen: frozen })); // optimistic
+    try {
+      await admin.setSignupFrozen(frozen);
+      toast(frozen ? "ההרשמה הוקפאה" : "ההרשמה נפתחה");
+    } catch (e) {
+      setOverview((o) => ({ ...o, signupFrozen: !frozen }));
+      toast(e.message);
+    }
+  };
 
   return (
     <motion.main
@@ -432,13 +534,13 @@ export default function AdminPage({ route, onContent }) {
               <Empty icon={ShieldAlert}>{error}</Empty>
             </Panel>
           ) : tab === "overview" ? (
-            <Overview data={overview} />
+            <Overview data={overview} onFrozen={setFrozen} />
           ) : tab === "reports" ? (
             <Reports key={`reports-${spin}`} onChanged={refresh} toast={toast} />
           ) : tab === "cards" ? (
             <AdminCards key={`cards-${spin}`} focusKey={cardKey} onChanged={refresh} onContent={onContent} toast={toast} />
           ) : (
-            <Users key={`users-${spin}`} />
+            <Users key={`users-${spin}`} onChanged={refresh} toast={toast} />
           )}
         </div>
       </div>

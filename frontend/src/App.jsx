@@ -10,7 +10,7 @@ import AdminPage from "./components/Admin.jsx";
 import { InstallSheet } from "./components/Install.jsx";
 import { Backdrop, Screen } from "./components/ui.jsx";
 import { LogoMark } from "./components/Logo.jsx";
-import { cacheContent, fetchContent, readCachedContent } from "./lib/api.js";
+import { cacheContent, clearCachedContent, fetchContent, readCachedContent } from "./lib/api.js";
 import { auth } from "./lib/auth.js";
 import { cards } from "./lib/cards.js";
 import { buildDeck, gameOf } from "./lib/deck.js";
@@ -88,14 +88,25 @@ export default function App() {
   };
 
   useEffect(() => {
+    auth.me().then(setUser).catch(() => setUser(null));
+  }, []);
+
+  // The API serves the cards to signed-in couples only: load them after sign-in, drop them on sign-out.
+  const userKey = user === undefined ? undefined : (user?.id ?? null);
+  useEffect(() => {
+    if (userKey === undefined) return;
+    if (userKey === null) {
+      setContent(null);
+      clearCachedContent();
+      return;
+    }
     fetchContent()
       .then((c) => {
         setContent(c);
         setError(null);
       })
-      .catch((e) => setError(e.message));
-    auth.me().then(setUser).catch(() => setUser(null));
-  }, []);
+      .catch((e) => (e.status === 401 ? setUser(null) : setError(e.message)));
+  }, [userKey]);
 
   const game = content && gameOf(content, gameId);
   const startGame = () => {
@@ -110,7 +121,7 @@ export default function App() {
 
   let screen;
   const publicRoute = route === "/login" || route === "/register" || route === "/privacy";
-  if (!content || user === undefined) {
+  if (user === undefined || (user && !content)) {
     screen = (
       <Screen key="loading" className="items-center justify-center gap-4 text-center">
         <LogoMark size={64} />

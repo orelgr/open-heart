@@ -10,7 +10,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,7 +31,7 @@ def load_env_file(path: Path) -> None:
 load_env_file(BASE_DIR / ".env")  # before the imports below read their settings
 
 from admin import ensure_admin, router as admin_router  # noqa: E402
-from auth import COOKIE_SECURE, backfill_name_lookups, purge_expired, router as auth_router  # noqa: E402
+from auth import COOKIE_SECURE, backfill_name_lookups, current_session, purge_expired, router as auth_router  # noqa: E402
 from cards import content as load_content, content_file, repo_newer, router as cards_router  # noqa: E402
 from db import closing_conn, init_db  # noqa: E402
 DIST_DIR = BASE_DIR.parent / "frontend" / "dist"
@@ -88,6 +88,8 @@ async def security_headers(request: Request, call_next):
         # revalidated, or phones keep running an old app build from the HTTP cache after a deploy.
         if request.url.path.startswith("/assets/"):
             h.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+        elif request.url.path.startswith("/api/"):
+            h.setdefault("Cache-Control", "private, no-cache")  # content needs a session: never in shared proxy caches
         else:
             h.setdefault("Cache-Control", "no-cache")
     return res
@@ -98,18 +100,22 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/api/content")
+# Game content is for signed-in couples only (keeps the cards private while sign-up is frozen).
+SIGNED_IN = [Depends(current_session)]
+
+
+@app.get("/api/content", dependencies=SIGNED_IN)
 def content():
     """Everything the client needs in one round-trip (fast navigation)."""
     return load_content()
 
 
-@app.get("/api/categories")
+@app.get("/api/categories", dependencies=SIGNED_IN)
 def categories():
     return [{k: v for k, v in c.items() if k != "questions"} for c in load_content()["categories"]]
 
 
-@app.get("/api/categories/{category_id}")
+@app.get("/api/categories/{category_id}", dependencies=SIGNED_IN)
 def category(category_id: str):
     for c in load_content()["categories"]:
         if c["id"] == category_id:
@@ -117,12 +123,12 @@ def category(category_id: str):
     raise HTTPException(status_code=404, detail="Category not found")
 
 
-@app.get("/api/power-cards")
+@app.get("/api/power-cards", dependencies=SIGNED_IN)
 def power_cards():
     return load_content()["powerCards"]
 
 
-@app.get("/api/rules")
+@app.get("/api/rules", dependencies=SIGNED_IN)
 def rules():
     return load_content()["rules"]
 

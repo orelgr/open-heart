@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 import security as sec
 from auth import ADMIN_USERNAME, CONTROL_RE, PRIVACY_VERSION, audit, current_session, require_same_origin, user_out
 from cards import EDITED_FILE, card_index, content, content_file, repo_newer, save_content
-from db import get_db, transaction
+from db import get_db, set_setting, signup_frozen, transaction
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 DAY = 86400
@@ -130,6 +130,7 @@ def overview(_admin: sqlite3.Row = Depends(require_admin), conn: sqlite3.Connect
         "topReported": top(
             "SELECT card_key, COUNT(*) n FROM card_reports WHERE status = 'open' GROUP BY card_key ORDER BY n DESC, MAX(created_at) DESC LIMIT 5"
         ),
+        "signupFrozen": signup_frozen(conn),
         "topAnswered": top("SELECT card_key, COUNT(*) n FROM answered_cards GROUP BY card_key ORDER BY n DESC LIMIT 5"),
     }
 
@@ -227,6 +228,37 @@ def users(_admin: sqlite3.Row = Depends(require_admin), conn: sqlite3.Connection
             }
         )
     return out
+
+
+@router.delete("/users/{public_id}", status_code=204, dependencies=[Depends(require_same_origin)])
+def delete_user(public_id: str, request: Request, admin: sqlite3.Row = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    """Erase a couple's account. Sessions and checked cards cascade; their reports stay, anonymized (user_id NULL)."""
+    with transaction(conn):
+        row = conn.execute("SELECT id, is_admin FROM users WHERE public_id = ?", (public_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "המשתמש לא נמצא")
+        if row["is_admin"]:
+            raise HTTPException(403, "אי אפשר למחוק את חשבון המנהל")
+        conn.execute("DELETE FROM users WHERE id = ?", (row["id"],))  # secure_delete zeroes the pages
+        audit(conn, "admin_user_deleted", admin["id"], request)
+
+
+# ---------- settings ----------
+class SettingsIn(BaseModel):
+    signupFrozen: bool
+
+
+@router.get("/settings")
+def get_settings(_admin: sqlite3.Row = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    return {"signupFrozen": signup_frozen(conn)}
+
+
+@router.patch("/settings", dependencies=[Depends(require_same_origin)])
+def update_settings(body: SettingsIn, request: Request, admin: sqlite3.Row = Depends(require_admin), conn: sqlite3.Connection = Depends(get_db)):
+    with transaction(conn):
+        set_setting(conn, "signup_frozen", "1" if body.signupFrozen else "0")
+        audit(conn, "admin_signup_frozen" if body.signupFrozen else "admin_signup_opened", admin["id"], request)
+    return {"signupFrozen": body.signupFrozen}
 
 
 # ---------- card editor ----------

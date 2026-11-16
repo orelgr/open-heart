@@ -19,6 +19,7 @@ async function call(path, { method = "GET", body } = {}) {
 }
 
 export const auth = {
+  signup: () => call("/signup"), // { open, message }: the admin can freeze new sign-ups
   me: () => call("/session").then((d) => d?.user ?? null), // never undefined, or the app waits forever
   register: (email, name, partner, password, consent) =>
     call("/register", { method: "POST", body: { email, name, partner, password, consent } }),

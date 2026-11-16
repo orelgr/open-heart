@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import AliasChoices, BaseModel, Field
 
 import security as sec
-from db import get_db, transaction
+from db import get_db, signup_frozen, transaction
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -33,6 +33,7 @@ NAME_FAIL_LIMIT = 5  # wrong passwords via name in 24 h before that account need
 # The admin signs in with this username (not a player name). Its password lives only in the server's
 # environment (ADMIN_PASSWORD_HASH in backend/.env), see admin.ensure_admin.
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip()
+SIGNUP_FROZEN = "המערכת כרגע בשיפוצים. נסו שוב מאוחר יותר."
 ADMIN_MANAGED = "סיסמת המנהל מנוהלת בשרת (ADMIN_PASSWORD_HASH)"
 
 ALLOWED_ORIGINS = {o.strip().rstrip("/") for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip() not in ("", "*")}
@@ -209,6 +210,8 @@ def current_session(request: Request, conn: sqlite3.Connection = Depends(get_db)
 # ---------- routes ----------
 @router.post("/register", status_code=201, dependencies=[Depends(require_same_origin)])
 def register(body: RegisterIn, request: Request, response: Response, conn: sqlite3.Connection = Depends(get_db)):
+    if signup_frozen(conn):  # admin switch (#/admin): no new accounts for now
+        raise HTTPException(503, SIGNUP_FROZEN)
     throttle(conn, f"register:{client_ip(request)}", limit=5, window=3600)
     if not body.consent:
         raise HTTPException(422, "יש לאשר את מדיניות הפרטיות")
@@ -344,6 +347,13 @@ def logout(request: Request, response: Response, conn: sqlite3.Connection = Depe
     if token:
         conn.execute("DELETE FROM sessions WHERE token_hash = ?", (sec.hash_token(token),))
     end_cookie(response)
+
+
+@router.get("/signup")
+def signup_state(conn: sqlite3.Connection = Depends(get_db)):
+    """Whether new accounts can be created (the register page shows the notice up front)."""
+    frozen = signup_frozen(conn)
+    return {"open": not frozen, "message": SIGNUP_FROZEN if frozen else None}
 
 
 @router.get("/session")

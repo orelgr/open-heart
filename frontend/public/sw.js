@@ -1,5 +1,5 @@
 // Open Heart service worker: app-shell cache-first, API network-first.
-const CACHE = "open-heart-v6";
+const CACHE = "open-heart-v7";
 const SHELL = ["/", "/index.html", "/icon.svg", "/manifest.webmanifest", "/apple-touch-icon.png", "/icon-192.png"];
 
 self.addEventListener("install", (e) => {
@@ -23,8 +23,11 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(
       fetch(request)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(request, copy));
+          if (res.ok) {
+            // only successful responses (a 401 for a signed-out visitor must not replace the cached content)
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(request, copy));
+          }
           return res;
         })
         .catch(() => caches.match(request).then((hit) => hit || caches.match("/index.html")))

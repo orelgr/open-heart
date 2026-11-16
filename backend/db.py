@@ -7,13 +7,14 @@ and this avoids sharing one across uvicorn's worker threads.
 """
 import os
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
 DATA_DIR = Path(os.getenv("DATA_DIR", Path(__file__).resolve().parent / "data"))
 DB_FILE = DATA_DIR / "open_heart.db"
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -86,6 +87,13 @@ CREATE TABLE IF NOT EXISTS auth_events (
     created_at INTEGER NOT NULL
 ) STRICT;
 CREATE INDEX IF NOT EXISTS auth_events_time ON auth_events(created_at);
+
+-- Admin switches (e.g. signup_frozen = "1": new accounts can't be created). v5.
+CREATE TABLE IF NOT EXISTS settings (
+    key        TEXT    PRIMARY KEY,
+    value      TEXT    NOT NULL,
+    updated_at INTEGER NOT NULL
+) STRICT, WITHOUT ROWID;
 """
 
 
@@ -145,6 +153,23 @@ def transaction(conn: sqlite3.Connection):
     except BaseException:
         conn.execute("ROLLBACK")
         raise
+
+
+def get_setting(conn: sqlite3.Connection, key: str, default: str = "") -> str:
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+    conn.execute(
+        "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        (key, value, int(time.time())),
+    )
+
+
+def signup_frozen(conn: sqlite3.Connection) -> bool:
+    return get_setting(conn, "signup_frozen", "0") == "1"
 
 
 def get_db():

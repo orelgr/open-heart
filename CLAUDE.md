@@ -37,15 +37,16 @@ Browser (React SPA, RTL Hebrew)  ──GET /api/content──►  FastAPI (backe
 | Route | Returns |
 |---|---|
 | `GET /api/health` | `{status:"ok"}` |
-| `GET /api/content` | whole `questions.json` |
+| `GET /api/content` | whole `questions.json` (**signed-in only**, like every content route: 401 for guests) |
 | `GET /api/categories` / `/api/categories/{id}` | category list (no questions) / one category |
 | `GET /api/power-cards`, `GET /api/rules` | subsets |
 | `GET /api/auth/session` | `{user|null}` (no 401 for guests) |
+| `GET /api/auth/signup` | `{open, message}`: sign-up frozen by the admin? (register returns 503 + the message when frozen) |
 | `POST /api/auth/register` `login` `logout` `password` | account flows (JSON body, Origin-checked, rate-limited) |
 | `GET/PATCH/DELETE /api/auth/me`, `GET /api/auth/export` | profile, rename couple `{name,partner}`, delete (needs password), data export |
 | `GET /api/cards/answered`, `PUT`/`DELETE /api/cards/answered/{key}`, `DELETE /api/cards/answered` | checked-off cards: list, mark, unmark, reset all |
 | `POST /api/cards/reports` | report a card `{key, game, reason: unclear|typo|inappropriate|duplicate|other, note}` (20/h) |
-| `GET /api/admin/overview` `reports?status=open|resolved|all` `users`, `PATCH /api/admin/reports {ids,status}`, `POST /api/admin/reports/delete {ids}` | admin panel (is_admin session, else 403) |
+| `GET /api/admin/overview` `reports?status=open|resolved|all` `users`, `PATCH /api/admin/reports {ids,status}`, `POST /api/admin/reports/delete {ids}`, `DELETE /api/admin/users/{publicId}`, `GET`/`PATCH /api/admin/settings {signupFrozen}` | admin panel (is_admin session, else 403) |
 | `GET /api/admin/content`, `PUT`/`DELETE /api/admin/cards/{key}`, `POST /api/admin/cards {group,…}` | card editor; each returns `{content, edited, repoNewer}` |
 | `GET /*` | built SPA (only if `frontend/dist` exists; path-traversal guarded) |
 
@@ -61,7 +62,10 @@ The admin is a normal account with `users.is_admin=1`, created/synced on every s
 password change/delete are blocked for it). Sign in with `ADMIN_USERNAME` ("admin"), intercepted before name sign-in;
 "admin" is a reserved player name. Home shows a dashboard button for admins. Tabs: סקירה (KPIs, most reported/answered)
 · דיווחים (grouped per card, open/resolved/all, search, resolve with undo toast, delete with inline confirm) · קלפים
-(card editor) · משתמשים (couples, masked emails).
+(card editor) · משתמשים (couples, masked emails, delete a couple with inline confirm; the admin itself can't be deleted).
+**Sign-up freeze**: switch at the top of סקירה (`settings.signup_frozen` in the DB, schema v5). When on, `/register` shows
+"המערכת כרגע בשיפוצים. נסו שוב מאוחר יותר." and the API refuses new accounts; existing accounts sign in as usual.
+Content is never served to guests (the client loads it after sign-in and clears its localStorage copy on sign-out).
 **Card editor** (`AdminCards.jsx`, shared bits in `adminUi.jsx`): all categories, games with own questions ("זה או זה",
 pairs) and power cards; edit text (power: title + text), delete (inline confirm), append new cards. A report's "לקלף"
 button opens `#/admin/cards/<key>`: the card is highlighted with its editor open and its open reports + "resolve".
@@ -189,7 +193,7 @@ answered-list, answered-toggle, reset-confirm, account-name, logout, delete-conf
 report-{open,sheet,note,submit,sent,close}, open-admin, admin, admin-tab-{overview,reports,users}, stat-users, stat-reports,
 report-status-{open,resolved,all}, report-list, report-item, report-{resolve,reopen,delete,delete-confirm,edit-card}, admin-toast, user-list,
 admin-tab-cards, card-groups, card-group-<id>, admin-card-list, admin-card-<key>, card-{edit,delete,delete-confirm,add,save},
-card-editor, card-editor-text, card-reports, card-reports-resolve, game-preview, game-steps, install-{open,sheet,close,prompt,ok,done,demo,steps}.
+card-editor, card-editor-text, card-reports, card-reports-resolve, game-preview, game-steps, install-{open,sheet,close,prompt,ok,done,demo,steps}, signup-{panel,freeze,closed}, user-delete, user-delete-confirm.
 
 ## React Native Migration Path
 Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) ports **unchanged**. Map:
@@ -218,6 +222,8 @@ Logic (`lib/deck.js`, `lib/api.js` minus localStorage, content JSON, backend) po
 | manifest / sw.js | not needed (app icons via `app.json`) |
 
 ## Changelog
+- 2026-11-16 - v1.14: admin can delete couples' accounts and freeze sign-up ("בשיפוצים" page); game content API now
+  requires a session, client clears cached cards on sign-out, sw v7 caches only OK responses. DB schema v5 (`settings`).
 - 2026-11-15 - v1.13: mini-game picker redesigned: animated how-to-play preview per game (mini deck, dilemma picks,
   guess + score, ticking timer, both answer, topic bubbles) with synced steps, calm 3×2 game grid, swipe between games.
 - 2026-11-15 - v1.12: **install the app** sheet (auto after sign-in in a phone browser, Home pill, hidden in the
